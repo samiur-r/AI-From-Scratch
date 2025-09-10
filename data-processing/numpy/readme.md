@@ -23,7 +23,7 @@ import numpy as np
 
 # From a Python list
 arr1 = np.array([1, 2, 3, 4])
-print(arr1)  # [1 2 3 4]
+print(arr1)  # [1, 2, 3, 4]
 
 # Zeros and ones
 arr2 = np.zeros((2, 3))  # [[0. 0. 0.] [0. 0. 0.]]
@@ -33,7 +33,7 @@ arr3 = np.ones((3, 2))   # [[1. 1.] [1. 1.] [1. 1.]]
 arr4 = np.arange(0, 10, 2)  # [0 2 4 6 8] (start, stop, step)
 
 # Evenly spaced numbers
-arr5 = np.linspace(0, 1, 5)  # [0. 0.25 0.5 0.75 1.]
+arr5 = np.linspace(0, 1, 5)  # [0. , 0.25, 0.5 , 0.75, 1.]
 
 ```
 
