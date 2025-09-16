@@ -520,9 +520,11 @@ df['dayofweek'] = df['date'].dt.dayofweek
 ## Advanced Topics
 
 ### Ensemble Methods
-Combine multiple models for better performance.
+Combine multiple models for better performance by leveraging the wisdom of crowds principle.
 
 #### Voting
+**Hard Voting**: Each model votes for a class, final prediction is the majority vote
+**Soft Voting**: Uses predicted probabilities, averages them for final decision (generally more effective)
 ```python
 from sklearn.ensemble import VotingClassifier
 
@@ -544,6 +546,8 @@ voting_clf = VotingClassifier(
 ```
 
 #### Bagging
+**Bootstrap Aggregating**: Trains multiple models on different random subsets of training data (with replacement), then averages predictions. Reduces variance and overfitting. Random Forest is the most popular bagging method.
+
 ```python
 from sklearn.ensemble import BaggingClassifier
 
@@ -555,6 +559,8 @@ bagging = BaggingClassifier(
 ```
 
 #### Boosting
+**Sequential Learning**: Trains models sequentially, where each new model focuses on correcting errors made by previous models. Reduces bias and can convert weak learners into strong ones. Popular variants include AdaBoost, Gradient Boosting, XGBoost, and LightGBM.
+
 ```python
 from sklearn.ensemble import AdaBoostClassifier, GradientBoostingClassifier
 
@@ -566,6 +572,8 @@ gb_clf = GradientBoostingClassifier(n_estimators=100, learning_rate=0.1)
 ```
 
 #### Stacking
+**Meta-Learning**: Uses a meta-model (final estimator) to learn how to best combine predictions from multiple base models. The meta-model is trained on out-of-fold predictions from base models, creating a two-level learning architecture that often achieves superior performance.
+
 ```python
 from sklearn.ensemble import StackingClassifier
 
