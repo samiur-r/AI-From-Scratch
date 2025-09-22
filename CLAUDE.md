@@ -1,8 +1,13 @@
 # Claude Code Guidelines for AI-From-Scratch Repository
 
+This repository contains documentation for both **machine learning algorithms** and **machine learning frameworks**. Each type requires a different documentation approach:
+
+- **Algorithms** (e.g., Support Vector Machines, Random Forest, K-Means): Focus on mathematical concepts, hyperparameters, and when to use the algorithm
+- **Frameworks** (e.g., PyTorch, TensorFlow, scikit-learn): Focus on practical usage, installation, and how to use the framework's APIs
+
 ## README Generation Guidelines for Machine Learning Algorithms
 
-When generating README files for machine learning algorithms in this repository, ensure each algorithm documentation includes the following comprehensive sections:
+When generating README files for **individual machine learning algorithms** in this repository, ensure each algorithm documentation includes the following comprehensive sections:
 
 ### 1. Algorithm Overview
 - **What the algorithm does**: Clear, concise explanation of the algorithm's purpose and functionality
@@ -205,3 +210,136 @@ print(f"Classification Report:\n{classification_report(y_test, y_pred)}")
 ---
 
 **Note**: These guidelines ensure that every algorithm README provides comprehensive, practical guidance that helps users understand not just how to implement the algorithm, but when and why to use it effectively.
+
+## README Generation Guidelines for Machine Learning Frameworks
+
+When generating README files for **machine learning frameworks** (such as PyTorch, TensorFlow, Lightning, scikit-learn), use a different approach focused on practical usage and framework capabilities:
+
+### Framework Documentation Structure
+
+#### 1. Installation and Setup
+- **Installation commands**: pip/conda installation with GPU support options
+- **Verification**: How to verify the installation works correctly
+- **Basic imports**: Essential imports needed to get started
+
+#### 2. Core Framework Concepts
+- **Basic operations**: Fundamental operations (tensors, data structures, etc.)
+- **Key abstractions**: Main classes and concepts (e.g., nn.Module, DataLoader)
+- **Simple examples**: Getting started with basic usage
+
+#### 3. Data Handling
+- **Data loading**: How to load and preprocess data using framework tools
+- **Data pipelines**: Framework-specific data pipeline patterns
+- **Built-in datasets**: Using framework's built-in datasets
+
+#### 4. Model Building
+- **Model definition**: How to define models using the framework's APIs
+- **Layer types**: Available layers and components
+- **Model compilation**: How to configure models for training
+
+#### 5. Training and Optimization
+- **Training loops**: Framework's training patterns and best practices
+- **Optimizers**: Available optimizers and how to configure them
+- **Loss functions**: Built-in loss functions and custom losses
+
+#### 6. Advanced Features
+- **Multi-GPU/distributed training**: Scaling to multiple devices
+- **Callbacks/hooks**: Extending functionality with framework-specific features
+- **Custom components**: Creating custom layers, losses, or training logic
+
+#### 7. Model Evaluation and Metrics
+- **Evaluation patterns**: How to evaluate models using framework tools
+- **Built-in metrics**: Available metrics and how to use them
+- **Visualization**: Integration with visualization tools
+
+#### 8. Model Deployment
+- **Saving/loading**: Model serialization and persistence
+- **Export formats**: Converting models for deployment (ONNX, TorchScript, etc.)
+- **Production inference**: Optimizing models for production use
+
+#### 9. Ecosystem Integration
+- **Related libraries**: How the framework integrates with other tools
+- **Extensions**: Popular extensions and add-ons
+- **Community resources**: Where to find additional help and resources
+
+### Framework Documentation Template
+
+```markdown
+# [Framework Name] Quick Reference
+
+[Brief description of the framework and its main use cases]
+
+### Installation
+```bash
+# Installation commands with different options
+```
+
+### Importing [Framework]
+```python
+# Essential imports
+```
+
+* * * * *
+
+## 1. [Core Concept 1]
+```python
+# Practical examples showing basic usage
+```
+
+## 2. [Core Concept 2]
+```python
+# More examples building on previous concepts
+```
+
+[Continue with 8-12 sections covering all major framework capabilities]
+
+* * * * *
+
+Summary
+=======
+
+- **Key feature 1** brief description
+- **Key feature 2** brief description
+- **Key feature 3** brief description
+[List main framework strengths and capabilities]
+```
+
+### Key Differences from Algorithm Documentation
+
+**Algorithm READMEs focus on:**
+- Mathematical concepts and theory
+- Hyperparameters and their effects
+- When to use the algorithm vs alternatives
+- Statistical assumptions and requirements
+- Performance characteristics and complexity
+
+**Framework READMEs focus on:**
+- Practical usage and code examples
+- Installation and setup procedures
+- Framework-specific APIs and patterns
+- Integration with other tools and libraries
+- Production deployment considerations
+
+### Framework Documentation Quality Standards
+
+- **Practical focus**: Emphasize how to use the framework, not theoretical concepts
+- **Complete examples**: Include working code examples for all major features
+- **Progressive complexity**: Start simple and build to advanced features
+- **Current best practices**: Use modern, recommended patterns and APIs
+- **Cross-references**: Link to official documentation and related frameworks
+
+### Examples of Framework vs Algorithm Documentation
+
+**Algorithm Example (SVM):**
+- Focuses on margin maximization, kernel trick, hyperparameters (C, gamma)
+- Explains mathematical foundations and when to use vs other classifiers
+- Discusses computational complexity and assumptions about data
+
+**Framework Example (PyTorch):**
+- Focuses on tensors, autograd, nn.Module, DataLoader usage
+- Shows practical code for building, training, and deploying models
+- Demonstrates framework-specific features like dynamic graphs and TorchScript
+
+---
+
+**Important**: Always identify whether you're documenting an **algorithm** or a **framework** before choosing the appropriate documentation pattern. This ensures consistency and provides users with the most relevant information for their needs.

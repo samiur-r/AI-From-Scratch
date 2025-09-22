@@ -1,874 +1,623 @@
-# PyTorch Framework Quick Reference
+# PyTorch Quick Reference
 
-PyTorch is an open-source deep learning framework developed by Meta (formerly Facebook) that provides a flexible and intuitive platform for building and training neural networks. It combines the ease of Python with the performance of C++ and CUDA for efficient tensor computations and automatic differentiation.
+PyTorch is an open-source deep learning framework developed by Meta that provides a flexible and intuitive platform for building and training neural networks. It offers dynamic computational graphs, seamless GPU acceleration, and a Pythonic API that makes it popular for both research and production.
 
-## What the Framework Does
+### Installation
+```bash
+# CPU only
+pip install torch torchvision torchaudio
 
-PyTorch provides a comprehensive ecosystem for deep learning development through several core components:
+# GPU (CUDA 11.8)
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
-1. **Tensor Operations**: Multi-dimensional arrays with GPU acceleration support, similar to NumPy but optimized for deep learning
-2. **Automatic Differentiation (Autograd)**: Automatic computation of gradients for backpropagation using dynamic computational graphs
-3. **Neural Network Modules**: High-level building blocks for constructing neural networks (nn.Module, nn.Linear, nn.Conv2d, etc.)
-4. **Optimization**: Built-in optimizers (SGD, Adam, RMSprop) for gradient-based learning
-5. **Data Loading**: Efficient data pipeline tools (DataLoader, Dataset) for handling large datasets
-6. **Model Deployment**: Tools for model serialization, ONNX export, and production deployment
+# GPU (CUDA 12.1)
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
-Key innovations:
-- **Dynamic computational graphs**: Define-by-run approach allows for flexible model architectures and debugging
-- **Pythonic design**: Intuitive APIs that feel natural to Python developers
-- **Eager execution**: Operations execute immediately, making debugging easier compared to static graph frameworks
-- **GPU acceleration**: Seamless tensor operations on CUDA-enabled GPUs
-- **Rich ecosystem**: Extensive libraries (torchvision, torchaudio, transformers) for specialized domains
+# Verify installation
+python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"
+```
 
-## When to Use It
+### Importing PyTorch
 
-### Problem Types
-- **Computer Vision**: Image classification, object detection, semantic segmentation, GANs
-- **Natural Language Processing**: Text classification, machine translation, language modeling
-- **Speech Processing**: Speech recognition, text-to-speech, audio analysis
-- **Reinforcement Learning**: Policy gradient methods, Q-learning, actor-critic algorithms
-- **Scientific Computing**: Physics simulations, mathematical modeling with gradients
-- **Time Series Analysis**: Forecasting, anomaly detection, sequence modeling
-- **Generative Modeling**: VAEs, GANs, diffusion models, autoregressive models
-
-### Development Characteristics
-- **Research and prototyping**: Rapid experimentation with new architectures and ideas
-- **Educational purposes**: Learning deep learning concepts with clear, readable code
-- **Production systems**: Scalable deployment with TorchScript and mobile optimization
-- **Custom architectures**: Building novel neural network designs from scratch
-- **Multi-modal learning**: Combining vision, text, and audio in unified models
-
-### Team and Infrastructure Context
-- Python-first development teams
-- Research labs and academic institutions
-- Companies requiring flexible model architectures
-- Projects needing seamless research-to-production pipelines
-- Teams prioritizing code readability and debugging capabilities
-- Organizations with mixed CPU/GPU infrastructure
-
-### Comparison with Alternatives
-- **Use PyTorch when**: Need flexibility, rapid prototyping, research focus, Python expertise, dynamic models
-- **Use TensorFlow when**: Large-scale production, mature MLOps pipelines, mobile/edge deployment priority
-- **Use JAX when**: High-performance computing, functional programming preference, research requiring custom gradients
-- **Use Keras when**: Simplicity is paramount, quick prototyping for standard architectures
-- **Use scikit-learn when**: Traditional machine learning, smaller datasets, interpretable models
-
-## Strengths & Weaknesses
-
-### Strengths
-- **Intuitive and Pythonic**: Natural Python syntax makes code readable and maintainable
-- **Dynamic computational graphs**: Flexible model architectures and easy debugging
-- **Strong community**: Large ecosystem with extensive documentation and tutorials
-- **Research-friendly**: Preferred by researchers for experimental work and novel architectures
-- **Seamless GPU acceleration**: Easy tensor operations on CUDA with minimal code changes
-- **Excellent debugging**: Standard Python debugging tools work naturally with PyTorch
-- **Rich ecosystem**: Comprehensive libraries for vision (torchvision), audio (torchaudio), text (transformers)
-- **Production ready**: TorchScript, ONNX export, and mobile deployment capabilities
-
-### Weaknesses
-- **Memory overhead**: Dynamic graphs can use more memory than static alternatives
-- **Performance optimization**: Requires more manual optimization compared to compiled frameworks
-- **Deployment complexity**: Additional steps needed for production optimization
-- **Learning curve**: Requires understanding of both Python and deep learning concepts
-- **Version compatibility**: Rapid development sometimes leads to breaking changes
-- **Mobile limitations**: While supported, not as optimized as some alternatives for edge devices
-- **Distributed training**: More complex setup compared to some cloud-native solutions
-
-## Important Hyperparameters
-
-### Model Architecture Parameters
-- **input_size**: Dimension of input features for linear layers
-- **hidden_size**: Number of neurons in hidden layers (64, 128, 256, 512 common)
-- **num_layers**: Depth of neural networks (2-20+ depending on architecture)
-- **output_size**: Number of output classes or regression targets
-- **activation_functions**: ReLU, GELU, Swish, Tanh choice affects learning dynamics
-- **dropout_rate**: Regularization strength (0.1-0.5 typical range)
-
-### Training Parameters
-- **learning_rate**: Step size for gradient updates (1e-5 to 1e-1 range)
-- **batch_size**: Number of samples per gradient update (16-512 common)
-- **epochs**: Number of complete passes through training data
-- **weight_decay**: L2 regularization strength (1e-5 to 1e-2)
-- **momentum**: For SGD optimizer (0.9 typical)
-- **betas**: For Adam optimizer ((0.9, 0.999) default)
-
-### Data Processing
-- **num_workers**: Number of parallel data loading processes (0-8 typical)
-- **pin_memory**: Enable faster GPU transfer (True for GPU training)
-- **shuffle**: Randomize training data order (True for training, False for validation)
-- **transform parameters**: Data augmentation settings (rotation, scaling, normalization)
-
-### Hardware Optimization
-- **device**: CPU vs GPU selection ('cuda' vs 'cpu')
-- **mixed_precision**: Enable FP16 training for memory efficiency
-- **gradient_accumulation**: Simulate larger batch sizes with limited memory
-- **dataloader_persistence**: Keep data workers alive between epochs
-
-### Optimization Scheduling
-- **lr_scheduler**: Learning rate decay strategy (StepLR, CosineAnnealingLR, ReduceLROnPlateau)
-- **warmup_steps**: Gradual learning rate increase at training start
-- **gradient_clipping**: Prevent exploding gradients (max_norm 1.0-5.0)
-
-## Key Assumptions
-
-### Hardware Assumptions
-- **CUDA compatibility**: GPU training assumes NVIDIA GPUs with CUDA support
-- **Memory availability**: Sufficient RAM for model and batch size combinations
-- **CPU performance**: Multi-core systems for efficient data loading
-- **Storage speed**: Fast disk I/O for large dataset loading
-
-### Data Assumptions
-- **Tensor format**: Data can be converted to PyTorch tensors efficiently
-- **Batch processing**: Data can be organized into fixed-size batches
-- **Gradient computation**: All operations in the model are differentiable
-- **Memory consistency**: Data fits in available system memory
-
-### Development Assumptions
-- **Python proficiency**: Developers understand Python programming concepts
-- **Deep learning knowledge**: Users understand neural network fundamentals
-- **Debugging capability**: Ability to use Python debugging tools effectively
-- **Version management**: Proper handling of PyTorch version dependencies
-
-### Mathematical Assumptions
-- **Automatic differentiation**: All model operations support gradient computation
-- **Numerical stability**: Computations remain stable with chosen data types
-- **Optimization convergence**: Gradient-based optimization can find good solutions
-- **Floating point arithmetic**: IEEE 754 floating point behavior
-
-### Violations and Consequences
-- **Insufficient memory**: Out-of-memory errors during training or inference
-- **CUDA unavailability**: Fallback to CPU with significant performance loss
-- **Non-differentiable operations**: Gradient flow interruption in computational graph
-- **Data type mismatches**: Runtime errors or unexpected behavior in tensor operations
-
-## Performance Characteristics
-
-### Computational Complexity
-- **Forward pass**: O(model_parameters × batch_size) for dense layers
-- **Backward pass**: Similar to forward pass for gradient computation
-- **Memory usage**: O(model_size + batch_size × sequence_length × hidden_size)
-- **GPU acceleration**: 10-100x speedup over CPU for large models
-
-### Scalability Factors
-- **Model size**: Performance scales sub-linearly with parameter count
-- **Batch size**: Nearly linear scaling until memory limits
-- **Sequence length**: Quadratic scaling for attention-based models
-- **Data loading**: Bottlenecked by disk I/O and preprocessing
-
-### Memory Management
-- **Tensor storage**: Automatic memory management with garbage collection
-- **GPU memory**: Manual management required for CUDA tensors
-- **Gradient accumulation**: Memory usage proportional to model size during backprop
-- **Dynamic graphs**: Memory overhead for graph construction and storage
-
-### Training Performance
-- **Convergence speed**: Depends on learning rate, batch size, and model architecture
-- **Throughput**: Measured in samples/second or batches/second
-- **Utilization**: GPU utilization percentage indicates efficiency
-- **Mixed precision**: 1.5-2x speedup with minimal accuracy loss
-
-### Inference Characteristics
-- **Latency**: Single sample prediction time
-- **Throughput**: Batch processing capability
-- **Memory footprint**: Model size for deployment
-- **Optimization**: TorchScript compilation for production speedup
-
-## Evaluation & Comparison
-
-### Model Performance Metrics
-- **Accuracy**: Classification correctness percentage
-- **Loss functions**: Cross-entropy, MSE, custom losses for different tasks
-- **F1 Score**: Balanced precision and recall measure
-- **ROC-AUC**: Area under the receiver operating characteristic curve
-- **Perplexity**: Language model evaluation metric
-
-### Training Metrics
-- **Training/Validation loss**: Monitor overfitting and convergence
-- **Learning curves**: Plot loss and metrics over epochs
-- **Gradient norms**: Check for vanishing/exploding gradients
-- **Learning rate scheduling**: Track LR changes over training
-- **Weight distributions**: Monitor parameter updates and saturation
-
-### Computational Metrics
-- **Training time**: Wall-clock time per epoch
-- **Memory usage**: Peak GPU/CPU memory consumption
-- **FLOPs**: Floating point operations for model complexity comparison
-- **Throughput**: Samples processed per second
-- **Energy consumption**: Power usage for efficiency comparison
-
-### Framework Comparison
-- **Development speed**: Time to implement and iterate on models
-- **Debugging ease**: Ability to inspect and modify during execution
-- **Production deployment**: Effort required for model serving
-- **Community support**: Availability of resources and solutions
-- **Ecosystem richness**: Third-party libraries and tools
-
-### Validation Strategies
-- **Cross-validation**: K-fold or time-based splits for robust evaluation
-- **Hold-out testing**: Final evaluation on unseen test data
-- **Ablation studies**: Component-wise performance analysis
-- **Statistical significance**: Multiple runs with different seeds
-- **Domain adaptation**: Performance across different data distributions
-
-## Practical Usage Guidelines
-
-### Getting Started
-- **Installation**: Use conda/pip with CUDA version matching your GPU drivers
-- **Environment setup**: Create isolated environments for different projects
-- **Version pinning**: Specify exact PyTorch versions for reproducibility
-- **GPU setup**: Verify CUDA installation and PyTorch GPU access
-- **Basic workflow**: Start with simple examples before complex architectures
-
-### Best Practices
-- **Code organization**: Separate data loading, model definition, training, and evaluation
-- **Reproducibility**: Set random seeds and use deterministic operations
-- **Logging**: Use tensorboard or wandb for experiment tracking
-- **Checkpointing**: Save model states regularly during training
-- **Profiling**: Use PyTorch profiler to identify performance bottlenecks
-
-### Common Mistakes
-- **Device mismatch**: Tensors and models on different devices (CPU vs GPU)
-- **Gradient accumulation**: Forgetting to zero gradients between batches
-- **Memory leaks**: Retaining computational graph unnecessarily
-- **Data type confusion**: Mixing float32/float64 or int32/int64 inconsistently
-- **Broadcasting errors**: Mismatched tensor dimensions in operations
-
-### Debugging Strategies
-- **Print statements**: Use print() to inspect tensor shapes and values
-- **Autograd profiling**: Trace gradient computation for debugging
-- **Model inspection**: Use model.named_parameters() to examine weights
-- **Tensor visualization**: Plot activations and gradients during training
-- **Step-by-step execution**: Debug complex models by component isolation
-
-### Production Considerations
-- **Model optimization**: Use TorchScript for inference speedup
-- **Memory optimization**: Implement gradient checkpointing for large models
-- **Deployment formats**: Export to ONNX for cross-platform deployment
-- **Error handling**: Robust exception handling for production systems
-- **Monitoring**: Track model performance and data drift in production
-
-## Complete Example
-
-Here's a comprehensive example implementing a complete deep learning pipeline with PyTorch:
-
-### Step 1: Environment Setup and Data Preparation
 ```python
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.data import Dataset, DataLoader
 import torchvision
 import torchvision.transforms as transforms
-import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.metrics import classification_report, confusion_matrix
-import seaborn as sns
+```
 
-# What's happening: Setting up PyTorch environment and checking GPU availability
-# Why this step: Proper setup ensures optimal performance and catches configuration issues early
+* * * * *
 
-# Check for GPU availability
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f"Using device: {device}")
+## 1. Tensors and Basic Operations
+
+```python
+# Creating tensors
+x = torch.tensor([1, 2, 3])  # From list
+y = torch.zeros(3, 4)        # Zeros tensor
+z = torch.ones(2, 3)         # Ones tensor
+random = torch.randn(2, 3)   # Random normal distribution
+
+# Tensor properties
+print(x.shape)     # torch.Size([3])
+print(x.dtype)     # torch.int64
+print(x.device)    # cpu
+
+# Move to GPU
 if torch.cuda.is_available():
-    print(f"GPU: {torch.cuda.get_device_name(0)}")
-    print(f"CUDA Version: {torch.version.cuda}")
+    x_gpu = x.cuda()  # or x.to('cuda')
+    print(x_gpu.device)  # cuda:0
 
-# Set random seeds for reproducibility
-torch.manual_seed(42)
-np.random.seed(42)
-if torch.cuda.is_available():
-    torch.cuda.manual_seed(42)
+# Basic operations
+a = torch.tensor([1.0, 2.0, 3.0])
+b = torch.tensor([4.0, 5.0, 6.0])
 
-# What's happening: Defining data transformations for training and testing
-# Why these transforms: Data augmentation improves generalization, normalization helps training stability
-transform_train = transforms.Compose([
+add = a + b              # Element-wise addition
+multiply = a * b         # Element-wise multiplication
+dot_product = torch.dot(a, b)  # Dot product
+matmul = torch.mm(a.unsqueeze(0), b.unsqueeze(1))  # Matrix multiplication
+
+# Reshaping
+x = torch.randn(4, 6)
+y = x.view(2, 12)        # Reshape to 2x12
+z = x.view(-1, 3)        # Reshape to ?x3 (automatic size)
+```
+
+* * * * *
+
+## 2. Automatic Differentiation (Autograd)
+
+```python
+# Enable gradient computation
+x = torch.tensor([2.0], requires_grad=True)
+y = torch.tensor([3.0], requires_grad=True)
+
+# Forward pass
+z = x**2 + y**3
+loss = z.sum()
+
+# Backward pass
+loss.backward()
+
+# Access gradients
+print(x.grad)  # dz/dx = 2*x = 4.0
+print(y.grad)  # dz/dy = 3*y^2 = 27.0
+
+# Gradient accumulation
+x.grad.zero_()  # Clear gradients
+z = x**3
+z.backward()
+print(x.grad)  # dz/dx = 3*x^2 = 12.0
+
+# Disable gradients for inference
+with torch.no_grad():
+    result = x**2  # No gradient tracking
+
+# Context for evaluation mode
+torch.set_grad_enabled(False)
+result = x**2  # No gradients
+torch.set_grad_enabled(True)
+```
+
+* * * * *
+
+## 3. Neural Network Modules
+
+```python
+# Define a simple neural network
+class SimpleNN(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(SimpleNN, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, output_size)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.2)
+
+    def forward(self, x):
+        x = self.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
+        return x
+
+# Create model
+model = SimpleNN(784, 128, 10)
+print(model)
+
+# Model parameters
+total_params = sum(p.numel() for p in model.parameters())
+trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+print(f"Total parameters: {total_params}")
+print(f"Trainable parameters: {trainable_params}")
+
+# Common layers
+conv_layer = nn.Conv2d(3, 64, kernel_size=3, padding=1)
+batch_norm = nn.BatchNorm2d(64)
+max_pool = nn.MaxPool2d(2, 2)
+adaptive_pool = nn.AdaptiveAvgPool2d((1, 1))
+
+# Sequential model
+sequential_model = nn.Sequential(
+    nn.Linear(784, 256),
+    nn.ReLU(),
+    nn.Dropout(0.3),
+    nn.Linear(256, 128),
+    nn.ReLU(),
+    nn.Linear(128, 10)
+)
+```
+
+* * * * *
+
+## 4. Data Loading and Preprocessing
+
+```python
+from torch.utils.data import Dataset, DataLoader, random_split
+import torchvision.transforms as transforms
+
+# Custom Dataset
+class CustomDataset(Dataset):
+    def __init__(self, data, targets, transform=None):
+        self.data = data
+        self.targets = targets
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        sample = self.data[idx]
+        if self.transform:
+            sample = self.transform(sample)
+        return sample, self.targets[idx]
+
+# Data transforms
+transform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize((0.5,), (0.5,)),  # Normalize to [-1, 1]
     transforms.RandomHorizontalFlip(p=0.5),
-    transforms.RandomRotation(10),
-    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-    transforms.ToTensor(),
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))  # CIFAR-10 stats
+    transforms.RandomRotation(10)
 ])
 
-transform_test = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-])
-
-# What's happening: Loading CIFAR-10 dataset with train/test splits
-# Why CIFAR-10: Well-established benchmark for image classification with reasonable computational requirements
-train_dataset = torchvision.datasets.CIFAR10(
-    root='./data', train=True, download=True, transform=transform_train
+# Built-in datasets
+train_dataset = torchvision.datasets.MNIST(
+    root='./data', train=True, download=True, transform=transform
 )
-test_dataset = torchvision.datasets.CIFAR10(
-    root='./data', train=False, download=True, transform=transform_test
+test_dataset = torchvision.datasets.MNIST(
+    root='./data', train=False, download=True, transform=transform
 )
 
-# Create validation split from training data
+# Split dataset
 train_size = int(0.8 * len(train_dataset))
 val_size = len(train_dataset) - train_size
 train_dataset, val_dataset = random_split(train_dataset, [train_size, val_size])
 
-# Create data loaders
-train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=2, pin_memory=True)
-val_loader = DataLoader(val_dataset, batch_size=128, shuffle=False, num_workers=2, pin_memory=True)
-test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False, num_workers=2, pin_memory=True)
+# Data loaders
+train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=2)
+val_loader = DataLoader(val_dataset, batch_size=64, shuffle=False, num_workers=2)
+test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
-classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-
-print(f"Training samples: {len(train_dataset)}")
-print(f"Validation samples: {len(val_dataset)}")
-print(f"Test samples: {len(test_dataset)}")
+# Iterate through data
+for batch_idx, (data, targets) in enumerate(train_loader):
+    print(f"Batch {batch_idx}: Data shape {data.shape}, Targets shape {targets.shape}")
+    if batch_idx == 0:  # Just show first batch
+        break
 ```
 
-### Step 2: Model Architecture Definition
+* * * * *
+
+## 5. Training and Optimization
+
 ```python
-# What's happening: Defining a CNN architecture using PyTorch's nn.Module
-# Why this design: Demonstrates PyTorch's modular approach and best practices for model definition
+# Loss functions
+criterion_classification = nn.CrossEntropyLoss()
+criterion_regression = nn.MSELoss()
+criterion_binary = nn.BCEWithLogitsLoss()
 
-class ConvNet(nn.Module):
-    """Convolutional Neural Network for CIFAR-10 classification"""
-
-    def __init__(self, num_classes=10, dropout_rate=0.3):
-        super(ConvNet, self).__init__()
-
-        # What's happening: Building convolutional feature extractor layers
-        # Why this structure: Gradually increases channels while reducing spatial dimensions
-        self.features = nn.Sequential(
-            # First conv block
-            nn.Conv2d(3, 32, kernel_size=3, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(32, 32, kernel_size=3, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2, 2),
-            nn.Dropout2d(0.25),
-
-            # Second conv block
-            nn.Conv2d(32, 64, kernel_size=3, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 64, kernel_size=3, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2, 2),
-            nn.Dropout2d(0.25),
-
-            # Third conv block
-            nn.Conv2d(64, 128, kernel_size=3, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(128, 128, kernel_size=3, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2, 2),
-            nn.Dropout2d(0.25),
-        )
-
-        # What's happening: Defining classifier head with dropout for regularization
-        # Why fully connected: Maps learned features to class probabilities
-        self.classifier = nn.Sequential(
-            nn.AdaptiveAvgPool2d((1, 1)),  # Global average pooling
-            nn.Flatten(),
-            nn.Linear(128, 256),
-            nn.ReLU(inplace=True),
-            nn.Dropout(dropout_rate),
-            nn.Linear(256, num_classes)
-        )
-
-        # Initialize weights
-        self._initialize_weights()
-
-    def forward(self, x):
-        """Forward pass through the network"""
-        # What the algorithm is learning: Hierarchical feature representations
-        # from low-level edges to high-level semantic concepts
-        x = self.features(x)
-        x = self.classifier(x)
-        return x
-
-    def _initialize_weights(self):
-        """Initialize network weights using best practices"""
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, 0, 0.01)
-                nn.init.constant_(m.bias, 0)
-
-# Initialize model and move to device
-model = ConvNet(num_classes=10).to(device)
-
-# Display model architecture and parameter count
-print("Model Architecture:")
-print(model)
-print(f"\nTotal parameters: {sum(p.numel() for p in model.parameters()):,}")
-print(f"Trainable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
-```
-
-### Step 3: Training Setup and Configuration
-```python
-# What's happening: Configuring loss function, optimizer, and learning rate scheduler
-# Why these choices: Cross-entropy for classification, Adam for adaptive learning rates,
-# CosineAnnealing for smooth learning rate decay
-
-# Loss function
-criterion = nn.CrossEntropyLoss()
-
-# Optimizer with weight decay for regularization
+# Optimizers
 optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
+# optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+# optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.01)
 
-# Learning rate scheduler
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100, eta_min=1e-6)
+# Learning rate schedulers
+scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+# scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=50)
+# scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5)
 
-# Training configuration
-num_epochs = 100
-best_val_acc = 0.0
-patience = 10
-patience_counter = 0
-
-# Lists to store training history
-train_losses = []
-train_accuracies = []
-val_losses = []
-val_accuracies = []
-
-print("Training configuration:")
-print(f"Optimizer: {optimizer.__class__.__name__}")
-print(f"Learning rate: {optimizer.param_groups[0]['lr']}")
-print(f"Scheduler: {scheduler.__class__.__name__}")
-print(f"Loss function: {criterion.__class__.__name__}")
-print(f"Number of epochs: {num_epochs}")
-```
-
-### Step 4: Training and Validation Functions
-```python
-# What's happening: Implementing training and validation loops with proper PyTorch patterns
-# Why separate functions: Modularity, reusability, and clear separation of concerns
-
+# Training loop
 def train_epoch(model, train_loader, criterion, optimizer, device):
-    """Train model for one epoch"""
-    model.train()  # Set model to training mode
-    running_loss = 0.0
+    model.train()
+    total_loss = 0
     correct = 0
     total = 0
 
-    for batch_idx, (data, targets) in enumerate(train_loader):
-        # Move data to device
+    for data, targets in train_loader:
         data, targets = data.to(device), targets.to(device)
 
-        # Zero gradients from previous iteration
+        # Zero gradients
         optimizer.zero_grad()
 
         # Forward pass
         outputs = model(data)
         loss = criterion(outputs, targets)
 
-        # Backward pass and optimization
+        # Backward pass
         loss.backward()
         optimizer.step()
 
         # Statistics
-        running_loss += loss.item()
+        total_loss += loss.item()
         _, predicted = outputs.max(1)
         total += targets.size(0)
         correct += predicted.eq(targets).sum().item()
 
-        # Print progress every 100 batches
-        if batch_idx % 100 == 0:
-            print(f'Batch {batch_idx}/{len(train_loader)}, '
-                  f'Loss: {loss.item():.4f}, '
-                  f'Acc: {100.*correct/total:.2f}%')
+    accuracy = 100. * correct / total
+    avg_loss = total_loss / len(train_loader)
+    return avg_loss, accuracy
 
-    epoch_loss = running_loss / len(train_loader)
-    epoch_acc = 100. * correct / total
-    return epoch_loss, epoch_acc
-
-def validate_epoch(model, val_loader, criterion, device):
-    """Validate model on validation set"""
-    model.eval()  # Set model to evaluation mode
-    running_loss = 0.0
+# Validation loop
+def validate(model, val_loader, criterion, device):
+    model.eval()
+    total_loss = 0
     correct = 0
     total = 0
 
-    with torch.no_grad():  # Disable gradient computation for efficiency
+    with torch.no_grad():
         for data, targets in val_loader:
             data, targets = data.to(device), targets.to(device)
-
             outputs = model(data)
             loss = criterion(outputs, targets)
 
-            running_loss += loss.item()
+            total_loss += loss.item()
             _, predicted = outputs.max(1)
             total += targets.size(0)
             correct += predicted.eq(targets).sum().item()
 
-    epoch_loss = running_loss / len(val_loader)
-    epoch_acc = 100. * correct / total
-    return epoch_loss, epoch_acc
+    accuracy = 100. * correct / total
+    avg_loss = total_loss / len(val_loader)
+    return avg_loss, accuracy
 
-def save_checkpoint(model, optimizer, scheduler, epoch, val_acc, path):
-    """Save model checkpoint"""
-    torch.save({
-        'epoch': epoch,
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'scheduler_state_dict': scheduler.state_dict(),
-        'val_acc': val_acc,
-    }, path)
+# Training loop
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model = model.to(device)
 
-print("Training and validation functions defined")
-```
-
-### Step 5: Training Loop with Monitoring
-```python
-# What's happening: Executing the complete training loop with early stopping and checkpointing
-# What the algorithm is learning: Visual feature hierarchies and classification boundaries
-# through iterative gradient-based optimization
-
-print("Starting training...")
-print("=" * 60)
+num_epochs = 10
+best_val_acc = 0
 
 for epoch in range(num_epochs):
-    print(f'Epoch {epoch+1}/{num_epochs}')
-    print('-' * 40)
+    train_loss, train_acc = train_epoch(model, train_loader, criterion_classification, optimizer, device)
+    val_loss, val_acc = validate(model, val_loader, criterion_classification, device)
 
-    # Train for one epoch
-    train_loss, train_acc = train_epoch(model, train_loader, criterion, optimizer, device)
+    scheduler.step()  # Update learning rate
 
-    # Validate
-    val_loss, val_acc = validate_epoch(model, val_loader, criterion, device)
-
-    # Update learning rate
-    scheduler.step()
-    current_lr = optimizer.param_groups[0]['lr']
-
-    # Store metrics
-    train_losses.append(train_loss)
-    train_accuracies.append(train_acc)
-    val_losses.append(val_loss)
-    val_accuracies.append(val_acc)
-
-    # Print epoch results
+    print(f'Epoch {epoch+1}/{num_epochs}:')
     print(f'Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}%')
     print(f'Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%')
-    print(f'Learning Rate: {current_lr:.6f}')
 
     # Save best model
     if val_acc > best_val_acc:
         best_val_acc = val_acc
-        save_checkpoint(model, optimizer, scheduler, epoch, val_acc, 'best_model.pth')
-        patience_counter = 0
-        print(f'New best validation accuracy: {best_val_acc:.2f}%')
-    else:
-        patience_counter += 1
-
-    # Early stopping
-    if patience_counter >= patience:
-        print(f'Early stopping triggered after {patience} epochs without improvement')
-        break
-
-    print()
-
-print(f"Training completed! Best validation accuracy: {best_val_acc:.2f}%")
+        torch.save(model.state_dict(), 'best_model.pth')
 ```
 
-### Step 6: Evaluation and Analysis
+* * * * *
+
+## 6. Model Evaluation and Metrics
+
 ```python
-# What's happening: Comprehensive model evaluation with detailed metrics and visualizations
-# How to interpret results: Multiple metrics provide different perspectives on model performance
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import confusion_matrix, classification_report
 
-def plot_training_history(train_losses, val_losses, train_accs, val_accs):
-    """Plot training history"""
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
-
-    # Plot losses
-    ax1.plot(train_losses, label='Training Loss', color='blue')
-    ax1.plot(val_losses, label='Validation Loss', color='red')
-    ax1.set_title('Training and Validation Loss')
-    ax1.set_xlabel('Epoch')
-    ax1.set_ylabel('Loss')
-    ax1.legend()
-    ax1.grid(True)
-
-    # Plot accuracies
-    ax2.plot(train_accs, label='Training Accuracy', color='blue')
-    ax2.plot(val_accs, label='Validation Accuracy', color='red')
-    ax2.set_title('Training and Validation Accuracy')
-    ax2.set_xlabel('Epoch')
-    ax2.set_ylabel('Accuracy (%)')
-    ax2.legend()
-    ax2.grid(True)
-
-    plt.tight_layout()
-    plt.show()
-
-def evaluate_model(model, test_loader, classes, device):
-    """Comprehensive model evaluation"""
+def evaluate_model(model, test_loader, device):
     model.eval()
     all_preds = []
     all_targets = []
-    test_loss = 0
-    correct = 0
-    total = 0
 
     with torch.no_grad():
         for data, targets in test_loader:
             data, targets = data.to(device), targets.to(device)
             outputs = model(data)
-
-            test_loss += F.cross_entropy(outputs, targets, reduction='sum').item()
             _, predicted = outputs.max(1)
-            total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
 
             all_preds.extend(predicted.cpu().numpy())
             all_targets.extend(targets.cpu().numpy())
 
-    # Calculate final metrics
-    test_loss /= len(test_loader.dataset)
-    test_acc = 100. * correct / total
+    # Calculate metrics
+    accuracy = accuracy_score(all_targets, all_preds)
+    precision = precision_score(all_targets, all_preds, average='macro')
+    recall = recall_score(all_targets, all_preds, average='macro')
+    f1 = f1_score(all_targets, all_preds, average='macro')
 
-    print(f'Test Loss: {test_loss:.4f}')
-    print(f'Test Accuracy: {test_acc:.2f}%')
-
-    # Detailed classification report
-    print('\nClassification Report:')
-    print(classification_report(all_targets, all_preds, target_names=classes))
+    print(f'Test Accuracy: {accuracy:.4f}')
+    print(f'Precision: {precision:.4f}')
+    print(f'Recall: {recall:.4f}')
+    print(f'F1 Score: {f1:.4f}')
 
     # Confusion matrix
     cm = confusion_matrix(all_targets, all_preds)
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-                xticklabels=classes, yticklabels=classes)
-    plt.title('Confusion Matrix')
-    plt.ylabel('True Label')
-    plt.xlabel('Predicted Label')
-    plt.show()
+    print('Confusion Matrix:')
+    print(cm)
 
-    # Per-class accuracy
-    class_correct = np.diag(cm)
-    class_total = cm.sum(axis=1)
-    class_accuracy = class_correct / class_total
+    # Classification report
+    print('\nClassification Report:')
+    print(classification_report(all_targets, all_preds))
 
-    print('\nPer-class Accuracy:')
-    for i, class_name in enumerate(classes):
-        print(f'{class_name}: {class_accuracy[i]:.3f}')
+    return accuracy, precision, recall, f1
 
-    return test_acc, all_preds, all_targets
-
-# Load best model
-checkpoint = torch.load('best_model.pth')
-model.load_state_dict(checkpoint['model_state_dict'])
-
-# Plot training history
-plot_training_history(train_losses, val_losses, train_accuracies, val_accuracies)
-
-# Evaluate on test set
-print("Final Model Evaluation:")
-print("=" * 50)
-test_accuracy, predictions, targets = evaluate_model(model, test_loader, classes, device)
+# Load best model and evaluate
+model.load_state_dict(torch.load('best_model.pth'))
+accuracy, precision, recall, f1 = evaluate_model(model, test_loader, device)
 ```
 
-### Step 7: Advanced Features and Production Deployment
+* * * * *
+
+## 7. Computer Vision with PyTorch
+
 ```python
-# What's happening: Demonstrating advanced PyTorch features for production deployment
-# How to use in practice: Model optimization, export formats, and inference pipelines
+import torchvision.models as models
 
-import torch.jit as jit
-import time
+# Pre-trained models
+resnet18 = models.resnet18(pretrained=True)
+resnet50 = models.resnet50(pretrained=True)
+vgg16 = models.vgg16(pretrained=True)
+densenet121 = models.densenet121(pretrained=True)
 
-def optimize_model_for_inference(model, example_input):
-    """Optimize model using TorchScript for faster inference"""
-    model.eval()
+# Modify for different number of classes
+num_classes = 10
+resnet18.fc = nn.Linear(resnet18.fc.in_features, num_classes)
 
-    # Trace the model
-    traced_model = torch.jit.trace(model, example_input)
+# Feature extraction (freeze pre-trained layers)
+for param in resnet18.parameters():
+    param.requires_grad = False
+resnet18.fc.requires_grad = True  # Only train final layer
 
-    # Optimize for inference
-    traced_model = torch.jit.optimize_for_inference(traced_model)
+# Custom CNN
+class CNN(nn.Module):
+    def __init__(self, num_classes=10):
+        super(CNN, self).__init__()
+        self.conv1 = nn.Conv2d(3, 32, 3, padding=1)
+        self.conv2 = nn.Conv2d(32, 64, 3, padding=1)
+        self.conv3 = nn.Conv2d(64, 128, 3, padding=1)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.fc1 = nn.Linear(128 * 4 * 4, 512)
+        self.fc2 = nn.Linear(512, num_classes)
+        self.dropout = nn.Dropout(0.3)
 
-    return traced_model
+    def forward(self, x):
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = self.pool(F.relu(self.conv3(x)))
+        x = x.view(-1, 128 * 4 * 4)
+        x = self.dropout(F.relu(self.fc1(x)))
+        x = self.fc2(x)
+        return x
 
-def benchmark_inference(model, test_loader, device, num_batches=10):
-    """Benchmark inference speed"""
-    model.eval()
-    start_time = time.time()
+# Image transforms for data augmentation
+train_transforms = transforms.Compose([
+    transforms.RandomResizedCrop(224),
+    transforms.RandomHorizontalFlip(),
+    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
 
-    with torch.no_grad():
-        for i, (data, _) in enumerate(test_loader):
-            if i >= num_batches:
-                break
-            data = data.to(device)
-            _ = model(data)
+test_transforms = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
+```
 
-    end_time = time.time()
-    avg_time = (end_time - start_time) / num_batches
-    return avg_time
+* * * * *
 
-# Create example input for tracing
-example_input = torch.randn(1, 3, 32, 32).to(device)
+## 8. Model Saving and Loading
 
-# Optimize model
-print("Optimizing model for inference...")
-optimized_model = optimize_model_for_inference(model, example_input)
+```python
+# Save model state dict (recommended)
+torch.save(model.state_dict(), 'model_weights.pth')
 
-# Benchmark performance
-print("Benchmarking inference speed...")
-original_time = benchmark_inference(model, test_loader, device)
-optimized_time = benchmark_inference(optimized_model, test_loader, device)
+# Load model state dict
+model = SimpleNN(784, 128, 10)
+model.load_state_dict(torch.load('model_weights.pth'))
+model.eval()
 
-print(f"Original model average batch time: {original_time:.4f}s")
-print(f"Optimized model average batch time: {optimized_time:.4f}s")
-print(f"Speedup: {original_time/optimized_time:.2f}x")
-
-# Save models in different formats
-print("\nSaving models...")
-
-# Save PyTorch state dict
-torch.save(model.state_dict(), 'model_state_dict.pth')
-
-# Save complete model
+# Save entire model
 torch.save(model, 'complete_model.pth')
 
-# Save TorchScript model
-optimized_model.save('torchscript_model.pt')
+# Load entire model
+model = torch.load('complete_model.pth')
 
-# Export to ONNX (optional, requires onnx package)
-try:
-    import onnx
-    torch.onnx.export(model, example_input, 'model.onnx',
-                     input_names=['input'], output_names=['output'],
-                     dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}})
-    print("Model exported to ONNX format")
-except ImportError:
-    print("ONNX not available, skipping ONNX export")
+# Save checkpoint with additional info
+checkpoint = {
+    'epoch': epoch,
+    'model_state_dict': model.state_dict(),
+    'optimizer_state_dict': optimizer.state_dict(),
+    'loss': loss,
+    'accuracy': accuracy
+}
+torch.save(checkpoint, 'checkpoint.pth')
 
-class InferenceEngine:
-    """Production-ready inference engine"""
-
-    def __init__(self, model_path, device='cpu'):
-        self.device = device
-        self.model = torch.jit.load(model_path, map_location=device)
-        self.model.eval()
-
-        # Preprocessing transform
-        self.transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-        ])
-
-        self.classes = ('plane', 'car', 'bird', 'cat', 'deer',
-                       'dog', 'frog', 'horse', 'ship', 'truck')
-
-    def predict(self, image):
-        """Predict single image"""
-        if not isinstance(image, torch.Tensor):
-            image = self.transform(image)
-
-        image = image.unsqueeze(0).to(self.device)
-
-        with torch.no_grad():
-            output = self.model(image)
-            probabilities = F.softmax(output, dim=1)
-            confidence, predicted = torch.max(probabilities, 1)
-
-        return {
-            'class': self.classes[predicted.item()],
-            'confidence': confidence.item(),
-            'probabilities': probabilities.squeeze().cpu().numpy()
-        }
-
-    def batch_predict(self, images, batch_size=32):
-        """Predict batch of images"""
-        results = []
-
-        for i in range(0, len(images), batch_size):
-            batch = images[i:i+batch_size]
-            batch_tensor = torch.stack([self.transform(img) for img in batch])
-            batch_tensor = batch_tensor.to(self.device)
-
-            with torch.no_grad():
-                outputs = self.model(batch_tensor)
-                probabilities = F.softmax(outputs, dim=1)
-                confidences, predictions = torch.max(probabilities, 1)
-
-            for j in range(len(batch)):
-                results.append({
-                    'class': self.classes[predictions[j].item()],
-                    'confidence': confidences[j].item(),
-                    'probabilities': probabilities[j].cpu().numpy()
-                })
-
-        return results
-
-# Create inference engine
-inference_engine = InferenceEngine('torchscript_model.pt', device)
-
-# Test inference engine
-sample_data, sample_target = next(iter(test_loader))
-sample_image = sample_data[0]
-
-result = inference_engine.predict(sample_image)
-print(f"\nInference Engine Test:")
-print(f"Predicted: {result['class']}")
-print(f"Confidence: {result['confidence']:.3f}")
-print(f"Actual: {classes[sample_target[0]]}")
-
-print("\nPyTorch pipeline complete!")
-print("Key features demonstrated:")
-print("1. Data loading and preprocessing with PyTorch datasets")
-print("2. Model definition using nn.Module with proper initialization")
-print("3. Training loop with validation and early stopping")
-print("4. Comprehensive evaluation with multiple metrics")
-print("5. Model optimization using TorchScript")
-print("6. Production-ready inference engine")
-print("7. Model export in multiple formats (PyTorch, TorchScript, ONNX)")
+# Load checkpoint
+checkpoint = torch.load('checkpoint.pth')
+model.load_state_dict(checkpoint['model_state_dict'])
+optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+epoch = checkpoint['epoch']
+loss = checkpoint['loss']
 ```
 
-## PyTorch Ecosystem Comparison
+* * * * *
 
-| Component | Purpose | Key Features | When to Use |
-|-----------|---------|--------------|-------------|
-| **PyTorch Core** | Deep learning framework | Dynamic graphs, autograd, GPU support | All PyTorch development |
-| **torchvision** | Computer vision | Pre-trained models, transforms, datasets | Image processing tasks |
-| **torchaudio** | Audio processing | Audio transforms, datasets, models | Speech and audio applications |
-| **torchtext** | Natural language processing | Text preprocessing, datasets | NLP tasks (being deprecated) |
-| **TorchScript** | Model optimization | JIT compilation, mobile deployment | Production inference |
-| **PyTorch Lightning** | High-level wrapper | Simplified training, logging, scaling | Rapid experimentation |
-| **Transformers (Hugging Face)** | Pre-trained transformers | BERT, GPT, T5 models | Modern NLP applications |
-| **FastAPI + PyTorch** | Model serving | REST API deployment | Web service deployment |
+## 9. Model Deployment and Optimization
 
-## Summary
+```python
+# TorchScript for production
+model.eval()
 
-**Key Takeaways:**
+# Trace the model
+example_input = torch.randn(1, 3, 224, 224)
+traced_model = torch.jit.trace(model, example_input)
+
+# Save traced model
+traced_model.save('traced_model.pt')
+
+# Load traced model
+loaded_traced_model = torch.jit.load('traced_model.pt')
+
+# Optimize for inference
+optimized_model = torch.jit.optimize_for_inference(traced_model)
+
+# ONNX export
+torch.onnx.export(
+    model,
+    example_input,
+    'model.onnx',
+    input_names=['input'],
+    output_names=['output'],
+    dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}}
+)
+
+# Quantization for mobile deployment
+quantized_model = torch.quantization.quantize_dynamic(
+    model, {torch.nn.Linear}, dtype=torch.qint8
+)
+
+# Mixed precision training
+from torch.cuda.amp import autocast, GradScaler
+
+scaler = GradScaler()
+
+for data, targets in train_loader:
+    optimizer.zero_grad()
+
+    with autocast():
+        outputs = model(data)
+        loss = criterion(outputs, targets)
+
+    scaler.scale(loss).backward()
+    scaler.step(optimizer)
+    scaler.update()
+```
+
+* * * * *
+
+## 10. Advanced Features
+
+```python
+# Custom loss function
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=1, gamma=2):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+
+    def forward(self, inputs, targets):
+        ce_loss = F.cross_entropy(inputs, targets, reduction='none')
+        pt = torch.exp(-ce_loss)
+        focal_loss = self.alpha * (1-pt)**self.gamma * ce_loss
+        return focal_loss.mean()
+
+# Custom learning rate scheduler
+class WarmupScheduler:
+    def __init__(self, optimizer, warmup_steps, max_lr):
+        self.optimizer = optimizer
+        self.warmup_steps = warmup_steps
+        self.max_lr = max_lr
+        self.step_count = 0
+
+    def step(self):
+        self.step_count += 1
+        if self.step_count <= self.warmup_steps:
+            lr = self.max_lr * self.step_count / self.warmup_steps
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = lr
+
+# Gradient clipping
+torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
+# Hooks for debugging
+def print_grad_norm(module, grad_input, grad_output):
+    print(f'Gradient norm: {grad_output[0].norm()}')
+
+# Register hook
+model.fc.register_backward_hook(print_grad_norm)
+
+# Model parallelism (multiple GPUs)
+if torch.cuda.device_count() > 1:
+    model = nn.DataParallel(model)
+
+# Distributed training setup
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
+
+# Initialize process group
+dist.init_process_group(backend='nccl')
+
+# Wrap model with DDP
+model = DDP(model, device_ids=[local_rank])
+```
+
+* * * * *
+
+## 11. PyTorch Ecosystem
+
+```python
+# PyTorch Lightning (high-level wrapper)
+import pytorch_lightning as pl
+
+class LightningModel(pl.LightningModule):
+    def __init__(self):
+        super().__init__()
+        self.model = SimpleNN(784, 128, 10)
+        self.criterion = nn.CrossEntropyLoss()
+
+    def forward(self, x):
+        return self.model(x)
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self.forward(x)
+        loss = self.criterion(y_hat, y)
+        self.log('train_loss', loss)
+        return loss
+
+    def configure_optimizers(self):
+        return torch.optim.Adam(self.parameters(), lr=0.001)
+
+# Hugging Face Transformers integration
+from transformers import BertModel, BertTokenizer
+
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+bert_model = BertModel.from_pretrained('bert-base-uncased')
+
+# Tensorboard logging
+from torch.utils.tensorboard import SummaryWriter
+
+writer = SummaryWriter('runs/experiment_1')
+writer.add_scalar('Loss/Train', train_loss, epoch)
+writer.add_scalar('Accuracy/Train', train_acc, epoch)
+writer.close()
+
+# Weights & Biases integration
+import wandb
+
+wandb.init(project="my-project")
+wandb.log({"train_loss": train_loss, "train_acc": train_acc})
+```
+
+* * * * *
+
+Summary
+=======
+
 - **Dynamic graphs** make PyTorch intuitive for research and debugging
-- **Pythonic design** reduces learning curve for Python developers
-- **Flexible architecture** supports custom models and experimental designs
-- **Strong ecosystem** provides tools for most deep learning applications
-- **Production ready** with TorchScript optimization and deployment tools
-- **GPU acceleration** is seamless and highly optimized
-- **Active community** ensures continued development and support
-
-**Quick Decision Guide:**
-- Choose **PyTorch** for research, experimentation, and custom architectures
-- Use **TorchScript** for production deployment and optimization
-- Leverage **pre-trained models** from torchvision and transformers libraries
-- Consider **PyTorch Lightning** for simplified training pipelines
-- Export to **ONNX** for cross-platform deployment
-- Use **mixed precision** training for memory efficiency on modern GPUs
-
-**Success Factors:**
-- Understand tensor operations and autograd fundamentals
-- Implement proper data loading and preprocessing pipelines
-- Use appropriate optimizers and learning rate schedules
-- Monitor training with logging and visualization tools
-- Optimize models for production using TorchScript and quantization
-- Follow PyTorch best practices for reproducible and maintainable code
+- **Autograd** automatically computes gradients for backpropagation
+- **nn.Module** provides a clean way to define neural network architectures
+- **DataLoader** efficiently handles data loading and batching
+- **GPU acceleration** is seamless with `.cuda()` or `.to(device)`
+- **TorchScript** optimizes models for production deployment
+- **Rich ecosystem** includes computer vision, NLP, and audio libraries
+- **Flexible design** supports custom layers, losses, and training loops
+- **Production ready** with ONNX export and mobile optimization
