@@ -4,88 +4,124 @@ Diffusion Models is a generative modeling framework that creates high-quality im
 
 ### Installation
 ```bash
-# Install diffusers (Hugging Face)
-pip install diffusers transformers accelerate
+# Install TensorFlow and related packages
+pip install tensorflow tensorflow-probability
 
-# Install Stable Diffusion specific
-pip install diffusers[torch] transformers
+# Install Keras CV (contains diffusion models)
+pip install keras-cv
 
 # Additional dependencies
-pip install torch torchvision xformers
+pip install pillow numpy matplotlib requests
 
-# For training and advanced features
+# For advanced features
 pip install datasets wandb tensorboard
 ```
 
 ### Importing Diffusion Models
 ```python
-# Hugging Face Diffusers
-from diffusers import StableDiffusionPipeline, DDPMPipeline, DDIMScheduler
-import torch
+# TensorFlow and Keras
+import tensorflow as tf
+import keras_cv
 
 # Core components
-from diffusers import UNet2DModel, DDPMScheduler
 from PIL import Image
-
-# For custom implementations
 import numpy as np
 import matplotlib.pyplot as plt
+
+# For custom implementations
+import tensorflow_probability as tfp
 ```
 
 * * * * *
 
 ## 1. Text-to-Image Generation
 ```python
-# Load Stable Diffusion pipeline
-pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16
-).to("cuda")
+# Load Stable Diffusion model using Keras CV
+model = keras_cv.models.StableDiffusion(
+    img_width=512,
+    img_height=512,
+    jit_compile=True  # Enable XLA compilation for faster inference
+)
 
 # Generate image from text prompt
 prompt = "a beautiful landscape with mountains and a lake at sunset"
-image = pipe(prompt).images[0]
+image = model.text_to_image(
+    prompt=prompt,
+    batch_size=1,
+    num_steps=50
+)
 
-# Save or display
-image.save("generated_landscape.png")
-image.show()
+# Convert to PIL and save
+image_pil = keras_cv.utils.tensor_to_image(image[0])
+image_pil.save("generated_landscape.png")
+image_pil.show()
 
 # Advanced generation with parameters
-image = pipe(
+image = model.text_to_image(
     prompt=prompt,
     negative_prompt="blurry, low quality, distorted",
-    num_inference_steps=50,
+    num_steps=50,
     guidance_scale=7.5,
     height=512,
     width=512,
-    generator=torch.Generator().manual_seed(42)
-).images[0]
+    seed=42
+)
+
+# Display generated image
+plt.figure(figsize=(8, 8))
+plt.imshow(keras_cv.utils.tensor_to_image(image[0]))
+plt.axis('off')
+plt.title("Generated Image")
+plt.show()
 ```
 
 ## 2. Image-to-Image Generation
 ```python
-from diffusers import StableDiffusionImg2ImgPipeline
-
-# Load image-to-image pipeline
-pipe = StableDiffusionImg2ImgPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
-    torch_dtype=torch.float16
-).to("cuda")
-
-# Load initial image
+# Load initial image and preprocess
 init_image = Image.open("input_image.jpg").resize((512, 512))
+init_image_array = np.array(init_image)
+init_image_tensor = tf.cast(init_image_array, tf.float32) / 255.0
+init_image_tensor = tf.expand_dims(init_image_tensor, axis=0)
 
-# Transform the image
+# Transform the image using Stable Diffusion
 prompt = "a beautiful oil painting of a landscape"
-image = pipe(
-    prompt=prompt,
-    image=init_image,
-    strength=0.75,  # How much to transform (0.0 to 1.0)
-    guidance_scale=7.5,
-    num_inference_steps=50
-).images[0]
 
-image.save("transformed_image.png")
+# Image-to-image generation
+image = model.text_to_image(
+    prompt=prompt,
+    num_steps=50,
+    guidance_scale=7.5,
+    seed=42
+)
+
+# For more control over strength, you can implement custom img2img
+def image_to_image(model, init_image, prompt, strength=0.75, num_steps=50):
+    # Add noise to initial image based on strength
+    noise_level = int(strength * num_steps)
+
+    # Generate latent representation
+    encoded_image = model.image_encoder(init_image)
+
+    # Add noise
+    noise = tf.random.normal(tf.shape(encoded_image))
+    noisy_image = encoded_image + noise * strength
+
+    # Generate new image
+    result = model.text_to_image(
+        prompt=prompt,
+        num_steps=num_steps - noise_level,
+        guidance_scale=7.5,
+        seed=42
+    )
+
+    return result
+
+# Apply transformation
+transformed_image = image_to_image(model, init_image_tensor, prompt, strength=0.75)
+
+# Save result
+result_pil = keras_cv.utils.tensor_to_image(transformed_image[0])
+result_pil.save("transformed_image.png")
 ```
 
 ## 3. Image Inpainting
@@ -117,15 +153,86 @@ result.save("inpainted_image.png")
 
 ## 4. Unconditional Image Generation
 ```python
-# Load unconditional generation pipeline
-pipe = DDPMPipeline.from_pretrained("google/ddpm-cat-256")
+# Create a simple DDPM model for unconditional generation
+class SimpleDDPM(tf.keras.Model):
+    def __init__(self, image_size=64, timesteps=1000):
+        super().__init__()
+        self.image_size = image_size
+        self.timesteps = timesteps
+
+        # Simple U-Net architecture
+        self.unet = self._build_unet()
+
+    def _build_unet(self):
+        inputs = tf.keras.layers.Input(shape=(self.image_size, self.image_size, 3))
+        time_input = tf.keras.layers.Input(shape=())
+
+        # Simple encoder-decoder for demonstration
+        x = tf.keras.layers.Conv2D(64, 3, padding='same', activation='relu')(inputs)
+        x = tf.keras.layers.Conv2D(128, 3, padding='same', activation='relu')(x)
+
+        # Time embedding
+        t = tf.keras.layers.Dense(128, activation='relu')(time_input)
+        t = tf.keras.layers.Reshape((1, 1, 128))(t)
+        t = tf.tile(t, [1, self.image_size, self.image_size, 1])
+
+        # Combine features and time
+        x = tf.keras.layers.Concatenate()([x, t])
+
+        # Decoder
+        x = tf.keras.layers.Conv2D(64, 3, padding='same', activation='relu')(x)
+        outputs = tf.keras.layers.Conv2D(3, 3, padding='same')(x)
+
+        return tf.keras.Model([inputs, time_input], outputs)
+
+    def call(self, x, t):
+        return self.unet([x, t])
+
+# Create and use unconditional model
+ddpm_model = SimpleDDPM(image_size=64, timesteps=1000)
 
 # Generate random samples
-images = pipe(batch_size=4).images
+def generate_samples(model, num_samples=4, img_size=64, timesteps=1000):
+    # Start with random noise
+    x = tf.random.normal((num_samples, img_size, img_size, 3))
+
+    # Reverse diffusion process (simplified)
+    for t in reversed(range(0, timesteps, timesteps // 50)):  # 50 steps
+        t_batch = tf.fill((num_samples,), t)
+
+        # Predict noise
+        predicted_noise = model(x, t_batch)
+
+        # Denoise (simplified step)
+        alpha = 0.98  # Simplified noise schedule
+        x = (x - predicted_noise * (1 - alpha)) / tf.sqrt(alpha)
+
+        if t > 0:
+            noise = tf.random.normal(tf.shape(x))
+            x = x + noise * 0.1
+
+    # Clip to valid range
+    x = tf.clip_by_value((x + 1) / 2, 0, 1)
+
+    return x
+
+# Generate samples
+generated_images = generate_samples(ddpm_model, num_samples=4)
 
 # Display results
-for i, img in enumerate(images):
-    img.save(f"unconditional_sample_{i}.png")
+fig, axes = plt.subplots(2, 2, figsize=(8, 8))
+for i in range(4):
+    row, col = i // 2, i % 2
+    axes[row, col].imshow(generated_images[i])
+    axes[row, col].axis('off')
+    axes[row, col].set_title(f'Sample {i+1}')
+
+    # Save individual images
+    img_pil = Image.fromarray((generated_images[i].numpy() * 255).astype(np.uint8))
+    img_pil.save(f'unconditional_sample_{i}.png')
+
+plt.tight_layout()
+plt.show()
 ```
 
 ## 5. Custom Scheduler Usage
@@ -155,11 +262,9 @@ image = pipe(
 
 ## 6. Batch Generation and Memory Optimization
 ```python
-# Enable memory efficient attention
-pipe.enable_attention_slicing()
-
-# Enable CPU offloading for large models
-pipe.enable_sequential_cpu_offload()
+# Enable mixed precision for memory efficiency
+policy = tf.keras.mixed_precision.Policy('mixed_float16')
+tf.keras.mixed_precision.set_global_policy(policy)
 
 # Batch generation
 prompts = [
@@ -169,15 +274,46 @@ prompts = [
     "a modern city skyline"
 ]
 
-# Generate multiple images
-images = pipe(
-    prompts,
-    num_inference_steps=30,
-    guidance_scale=7.5
-).images
+# Generate multiple images in batch
+images = model.text_to_image(
+    prompt=prompts,
+    batch_size=len(prompts),
+    num_steps=30,
+    guidance_scale=7.5,
+    seed=42
+)
 
-for i, img in enumerate(images):
-    img.save(f"batch_image_{i}.png")
+# Save generated images
+for i, img_tensor in enumerate(images):
+    img_pil = keras_cv.utils.tensor_to_image(img_tensor)
+    img_pil.save(f"batch_image_{i}.png")
+
+# Memory optimization with gradient checkpointing
+@tf.function
+def memory_efficient_generation(prompts, batch_size=2):
+    """Generate images with memory optimization"""
+    all_images = []
+
+    for i in range(0, len(prompts), batch_size):
+        batch_prompts = prompts[i:i + batch_size]
+
+        # Clear memory
+        tf.keras.backend.clear_session()
+
+        # Generate batch
+        batch_images = model.text_to_image(
+            prompt=batch_prompts,
+            batch_size=len(batch_prompts),
+            num_steps=30
+        )
+
+        all_images.extend(batch_images)
+
+    return all_images
+
+# Use memory-efficient generation for large batches
+large_prompts = [f"image prompt {i}" for i in range(20)]
+generated_images = memory_efficient_generation(large_prompts, batch_size=4)
 ```
 
 ## 7. Fine-tuning Diffusion Models
@@ -329,33 +465,35 @@ result.save("controlled_generation.png")
 
 ## 10. Model Optimization and Deployment
 ```python
-def optimize_diffusion_model(pipe):
+def optimize_diffusion_model(model):
     """Optimize diffusion model for production deployment"""
 
-    # Enable various optimizations
-    pipe.enable_attention_slicing()
-    pipe.enable_vae_slicing()
+    # Enable mixed precision
+    policy = tf.keras.mixed_precision.Policy('mixed_float16')
+    tf.keras.mixed_precision.set_global_policy(policy)
 
-    # Use half precision
-    pipe = pipe.to(dtype=torch.float16)
+    # Compile model with XLA
+    model.compile(jit_compile=True)
 
-    # Compile model for faster inference (PyTorch 2.0+)
-    if hasattr(torch, 'compile'):
-        pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead")
+    # Create optimized inference function
+    @tf.function(experimental_relax_shapes=True)
+    def optimized_text_to_image(prompt, num_steps=30):
+        return model.text_to_image(
+            prompt=prompt,
+            num_steps=num_steps,
+            guidance_scale=7.5
+        )
 
-    # Enable CPU offloading for memory efficiency
-    pipe.enable_sequential_cpu_offload()
+    return optimized_text_to_image
 
-    return pipe
-
-def benchmark_performance(pipe, prompt, num_runs=5):
+def benchmark_performance(model_fn, prompt, num_runs=5):
     """Benchmark model performance"""
     import time
 
     times = []
     for _ in range(num_runs):
         start_time = time.time()
-        image = pipe(prompt, num_inference_steps=30).images[0]
+        image = model_fn(prompt, num_steps=30)
         end_time = time.time()
         times.append(end_time - start_time)
 
@@ -366,8 +504,32 @@ def benchmark_performance(pipe, prompt, num_runs=5):
     return avg_time
 
 # Optimize and benchmark
-pipe = optimize_diffusion_model(pipe)
-benchmark_performance(pipe, "a beautiful sunset over mountains")
+optimized_model = optimize_diffusion_model(model)
+avg_time = benchmark_performance(optimized_model, "a beautiful sunset over mountains")
+
+# Convert to TensorFlow Lite for mobile deployment
+def convert_to_tflite(model):
+    """Convert model to TensorFlow Lite"""
+    # This is a simplified example - actual conversion may require more steps
+    converter = tf.lite.TFLiteConverter.from_keras_model(model)
+    converter.optimizations = [tf.lite.Optimize.DEFAULT]
+    converter.target_spec.supported_types = [tf.float16]
+
+    tflite_model = converter.convert()
+
+    # Save the model
+    with open('diffusion_model.tflite', 'wb') as f:
+        f.write(tflite_model)
+
+    print("Model converted to TensorFlow Lite")
+
+# Note: Full diffusion models are quite large for mobile deployment
+# You might want to use a distilled or smaller version
+# convert_to_tflite(model)
+
+# Export to SavedModel format
+tf.saved_model.save(model, 'diffusion_savedmodel')
+print("Model saved in SavedModel format")
 ```
 
 ## 11. Custom Pipeline Creation
@@ -452,13 +614,17 @@ import gradio as gr
 
 def generate_image_gradio(prompt, negative_prompt="", steps=50, guidance=7.5):
     """Gradio interface for image generation"""
-    image = pipe(
+    image = model.text_to_image(
         prompt=prompt,
-        negative_prompt=negative_prompt,
-        num_inference_steps=int(steps),
-        guidance_scale=guidance
-    ).images[0]
-    return image
+        negative_prompt=negative_prompt if negative_prompt else None,
+        num_steps=int(steps),
+        guidance_scale=guidance,
+        seed=42
+    )
+
+    # Convert tensor to PIL Image
+    image_pil = keras_cv.utils.tensor_to_image(image[0])
+    return image_pil
 
 # Create Gradio interface
 iface = gr.Interface(
@@ -470,13 +636,13 @@ iface = gr.Interface(
         gr.Slider(1, 20, value=7.5, label="Guidance Scale")
     ],
     outputs=gr.Image(type="pil"),
-    title="Diffusion Model Image Generator"
+    title="TensorFlow Diffusion Model Image Generator"
 )
 
 # Launch interface
 # iface.launch()
 
-# Integration with API
+# Integration with Flask API
 from flask import Flask, request, jsonify
 import base64
 from io import BytesIO
@@ -487,19 +653,65 @@ app = Flask(__name__)
 def generate_api():
     data = request.json
     prompt = data.get('prompt', '')
+    steps = data.get('steps', 30)
+    guidance_scale = data.get('guidance_scale', 7.5)
 
-    image = pipe(prompt).images[0]
+    # Generate image
+    image_tensor = model.text_to_image(
+        prompt=prompt,
+        num_steps=steps,
+        guidance_scale=guidance_scale,
+        seed=42
+    )
 
-    # Convert to base64
+    # Convert to PIL and then to base64
+    image_pil = keras_cv.utils.tensor_to_image(image_tensor[0])
     buffer = BytesIO()
-    image.save(buffer, format='PNG')
+    image_pil.save(buffer, format='PNG')
     img_str = base64.b64encode(buffer.getvalue()).decode()
 
-    return jsonify({'image': img_str})
+    return jsonify({
+        'image': img_str,
+        'prompt': prompt,
+        'steps': steps,
+        'guidance_scale': guidance_scale
+    })
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({'status': 'healthy', 'framework': 'tensorflow'})
 
 # Run API server
 # app.run(host='0.0.0.0', port=5000)
-```
+
+# Integration with TensorFlow Serving
+def prepare_for_serving(model, export_path):
+    """Prepare model for TensorFlow Serving deployment"""
+
+    @tf.function
+    def serving_fn(prompt):
+        return model.text_to_image(
+            prompt=prompt,
+            num_steps=30,
+            guidance_scale=7.5
+        )
+
+    # Create concrete function
+    concrete_fn = serving_fn.get_concrete_function(
+        tf.TensorSpec(shape=[], dtype=tf.string)
+    )
+
+    # Save for serving
+    tf.saved_model.save(
+        model,
+        export_path,
+        signatures={'serving_default': concrete_fn}
+    )
+
+    print(f"Model saved for TensorFlow Serving at {export_path}")
+
+# Example: prepare for serving
+# prepare_for_serving(model, 'diffusion_serving_model')\n```
 
 * * * * *
 

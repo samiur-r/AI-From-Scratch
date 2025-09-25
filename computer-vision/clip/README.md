@@ -4,54 +4,51 @@ CLIP is a multimodal framework that learns joint representations of images and t
 
 ### Installation
 ```bash
-# Install CLIP with Hugging Face Transformers
-pip install transformers torch torchvision
+# Install CLIP with TensorFlow and Transformers
+pip install tensorflow transformers
 
-# Install OpenAI's original CLIP
-pip install clip-by-openai
+# For GPU support
+pip install tensorflow[and-cuda]
 
-# Alternative installation
-pip install git+https://github.com/openai/CLIP.git
-
-# For additional dependencies
-pip install ftfy regex tqdm Pillow
+# Additional dependencies
+pip install pillow requests numpy matplotlib scikit-learn
 ```
 
 ### Importing CLIP
 ```python
-# Using Hugging Face Transformers
-from transformers import CLIPProcessor, CLIPModel
-import torch
-
-# Using OpenAI's CLIP
-import clip
+# TensorFlow with Hugging Face Transformers
+import tensorflow as tf
+from transformers import TFCLIPModel, CLIPProcessor
 
 # Additional utilities
 from PIL import Image
 import requests
 import numpy as np
+import matplotlib.pyplot as plt
 ```
 
 * * * * *
 
 ## 1. Loading Pre-trained Models
 ```python
-# Using Hugging Face Transformers
-model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+# Using TensorFlow with Hugging Face Transformers
+model = TFCLIPModel.from_pretrained("openai/clip-vit-base-patch32")
 processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
-# Using OpenAI's CLIP
-device = "cuda" if torch.cuda.is_available() else "cpu"
-model, preprocess = clip.load("ViT-B/32", device=device)
-
 # Available CLIP models:
-# ViT-B/32, ViT-B/16, ViT-L/14, ViT-L/14@336px
-# RN50, RN101, RN50x4, RN50x16, RN50x64
+# openai/clip-vit-base-patch32
+# openai/clip-vit-base-patch16
+# openai/clip-vit-large-patch14
+
+# Load different model sizes
+model_large = TFCLIPModel.from_pretrained("openai/clip-vit-large-patch14")
+processor_large = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
+
+print(f"Model loaded successfully with {model.config.vision_config.hidden_size} hidden size")
 ```
 
 ## 2. Zero-Shot Image Classification
 ```python
-# Using Hugging Face
 def zero_shot_classification(image_path, candidate_labels):
     image = Image.open(image_path)
 
@@ -62,22 +59,21 @@ def zero_shot_classification(image_path, candidate_labels):
     inputs = processor(
         text=text_prompts,
         images=image,
-        return_tensors="pt",
+        return_tensors="tf",
         padding=True
     )
 
     # Get predictions
-    with torch.no_grad():
-        outputs = model(**inputs)
-        logits_per_image = outputs.logits_per_image
-        probs = logits_per_image.softmax(dim=1)
+    outputs = model(**inputs)
+    logits_per_image = outputs.logits_per_image
+    probs = tf.nn.softmax(logits_per_image, axis=1)
 
     # Return results
     results = []
     for i, label in enumerate(candidate_labels):
         results.append({
             'label': label,
-            'score': probs[0][i].item()
+            'score': float(probs[0][i])
         })
 
     return sorted(results, key=lambda x: x['score'], reverse=True)
@@ -98,23 +94,22 @@ def compute_similarity(images, texts):
     inputs = processor(
         text=texts,
         images=images,
-        return_tensors="pt",
+        return_tensors="tf",
         padding=True
     )
 
-    with torch.no_grad():
-        # Get embeddings
-        image_embeds = model.get_image_features(pixel_values=inputs['pixel_values'])
-        text_embeds = model.get_text_features(input_ids=inputs['input_ids'])
+    # Get embeddings
+    image_embeds = model.get_image_features(pixel_values=inputs['pixel_values'])
+    text_embeds = model.get_text_features(input_ids=inputs['input_ids'])
 
-        # Normalize embeddings
-        image_embeds = image_embeds / image_embeds.norm(p=2, dim=-1, keepdim=True)
-        text_embeds = text_embeds / text_embeds.norm(p=2, dim=-1, keepdim=True)
+    # Normalize embeddings
+    image_embeds = tf.nn.l2_normalize(image_embeds, axis=-1)
+    text_embeds = tf.nn.l2_normalize(text_embeds, axis=-1)
 
-        # Compute similarity
-        similarity = torch.matmul(text_embeds, image_embeds.T)
+    # Compute similarity
+    similarity = tf.matmul(text_embeds, image_embeds, transpose_b=True)
 
-    return similarity.cpu().numpy()
+    return similarity.numpy()
 
 # Example
 images = [Image.open("image1.jpg"), Image.open("image2.jpg")]
@@ -230,20 +225,18 @@ def extract_features(images=None, texts=None):
 
     if images is not None:
         # Process images
-        image_inputs = processor(images=images, return_tensors="pt")
-        with torch.no_grad():
-            image_features = model.get_image_features(**image_inputs)
-            # Normalize features
-            image_features = image_features / image_features.norm(p=2, dim=-1, keepdim=True)
+        image_inputs = processor(images=images, return_tensors="tf")
+        image_features = model.get_image_features(**image_inputs)
+        # Normalize features
+        image_features = tf.nn.l2_normalize(image_features, axis=-1)
         features['image_features'] = image_features
 
     if texts is not None:
         # Process texts
-        text_inputs = processor(text=texts, return_tensors="pt", padding=True)
-        with torch.no_grad():
-            text_features = model.get_text_features(**text_inputs)
-            # Normalize features
-            text_features = text_features / text_features.norm(p=2, dim=-1, keepdim=True)
+        text_inputs = processor(text=texts, return_tensors="tf", padding=True)
+        text_features = model.get_text_features(**text_inputs)
+        # Normalize features
+        text_features = tf.nn.l2_normalize(text_features, axis=-1)
         features['text_features'] = text_features
 
     return features
@@ -257,7 +250,9 @@ print("Image features shape:", features['image_features'].shape)
 print("Text features shape:", features['text_features'].shape)
 
 # Save features for later use
-torch.save(features, 'clip_features.pt')
+np.savez('clip_features.npz',
+         image_features=features['image_features'].numpy(),
+         text_features=features['text_features'].numpy())
 ```
 
 ## 7. Batch Processing for Efficiency
@@ -272,21 +267,36 @@ def batch_process_images(image_paths, batch_size=32):
         batch_images = [Image.open(path) for path in batch_paths]
 
         # Process batch
-        inputs = processor(images=batch_images, return_tensors="pt")
+        inputs = processor(images=batch_images, return_tensors="tf")
 
-        with torch.no_grad():
-            features = model.get_image_features(**inputs)
-            features = features / features.norm(p=2, dim=-1, keepdim=True)
+        features = model.get_image_features(**inputs)
+        features = tf.nn.l2_normalize(features, axis=-1)
 
         all_features.append(features)
         print(f"Processed batch {i//batch_size + 1}/{(len(image_paths) + batch_size - 1)//batch_size}")
 
-    return torch.cat(all_features, dim=0)
+    return tf.concat(all_features, axis=0)
 
 # Example
 image_paths = [f"dataset/image_{i:05d}.jpg" for i in range(1000)]
 all_image_features = batch_process_images(image_paths, batch_size=32)
 print(f"Total features shape: {all_image_features.shape}")
+
+# Process with tf.data for even better performance
+def create_image_dataset(image_paths, batch_size=32):
+    def load_and_preprocess_image(path):
+        image = tf.io.read_file(path)
+        image = tf.image.decode_image(image, channels=3)
+        image = tf.image.resize(image, [224, 224])
+        image = tf.cast(image, tf.float32) / 255.0
+        return image
+
+    dataset = tf.data.Dataset.from_tensor_slices(image_paths)
+    dataset = dataset.map(load_and_preprocess_image, num_parallel_calls=tf.data.AUTOTUNE)
+    dataset = dataset.batch(batch_size)
+    dataset = dataset.prefetch(tf.data.AUTOTUNE)
+
+    return dataset
 ```
 
 ## 8. Custom Classification with Prompt Engineering
@@ -357,71 +367,80 @@ for result in results:
 
 ## 9. Fine-tuning CLIP
 ```python
-from torch.utils.data import DataLoader, Dataset
+def create_dataset_for_training(image_paths, texts, processor, batch_size=16):
+    """Create TensorFlow dataset for CLIP training"""
 
-class ImageTextDataset(Dataset):
-    def __init__(self, image_paths, texts, processor):
-        self.image_paths = image_paths
-        self.texts = texts
-        self.processor = processor
+    def preprocess_function(image_path, text):
+        # Load and process image
+        image = tf.io.read_file(image_path)
+        image = tf.image.decode_image(image, channels=3)
+        image = tf.image.resize(image, [224, 224])
+        image = tf.cast(image, tf.float32) / 255.0
 
-    def __len__(self):
-        return len(self.image_paths)
+        return {'pixel_values': image, 'text': text}
 
-    def __getitem__(self, idx):
-        image = Image.open(self.image_paths[idx])
-        text = self.texts[idx]
+    dataset = tf.data.Dataset.from_tensor_slices((image_paths, texts))
+    dataset = dataset.map(preprocess_function, num_parallel_calls=tf.data.AUTOTUNE)
+    dataset = dataset.batch(batch_size)
+    dataset = dataset.prefetch(tf.data.AUTOTUNE)
 
-        inputs = self.processor(
-            text=text,
-            images=image,
-            return_tensors="pt",
-            padding=True
-        )
+    return dataset
 
-        return {k: v.squeeze() for k, v in inputs.items()}
+def contrastive_loss(logits_per_image, logits_per_text):
+    """CLIP contrastive loss"""
+    batch_size = tf.shape(logits_per_image)[0]
+    labels = tf.range(batch_size)
+
+    loss_img = tf.keras.losses.sparse_categorical_crossentropy(
+        labels, logits_per_image, from_logits=True
+    )
+    loss_txt = tf.keras.losses.sparse_categorical_crossentropy(
+        labels, logits_per_text, from_logits=True
+    )
+
+    return (tf.reduce_mean(loss_img) + tf.reduce_mean(loss_txt)) / 2
 
 def fine_tune_clip(model, train_dataset, val_dataset, epochs=5, lr=1e-5):
     """Fine-tune CLIP on custom data"""
 
-    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=16, shuffle=False)
+    optimizer = tf.keras.optimizers.AdamW(learning_rate=lr)
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+    @tf.function
+    def train_step(batch):
+        with tf.GradientTape() as tape:
+            outputs = model(
+                pixel_values=batch['pixel_values'],
+                input_ids=batch['input_ids'],
+                training=True
+            )
+
+            loss = contrastive_loss(
+                outputs.logits_per_image,
+                outputs.logits_per_text
+            )
+
+        gradients = tape.gradient(loss, model.trainable_variables)
+        optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+
+        return loss
 
     for epoch in range(epochs):
-        model.train()
         total_loss = 0
+        num_batches = 0
 
-        for batch in train_loader:
-            optimizer.zero_grad()
+        for batch in train_dataset:
+            loss = train_step(batch)
+            total_loss += loss
+            num_batches += 1
 
-            outputs = model(**batch)
-
-            # CLIP contrastive loss
-            logits_per_image = outputs.logits_per_image
-            logits_per_text = outputs.logits_per_text
-
-            batch_size = logits_per_image.shape[0]
-            labels = torch.arange(batch_size, device=logits_per_image.device)
-
-            loss_img = torch.nn.functional.cross_entropy(logits_per_image, labels)
-            loss_txt = torch.nn.functional.cross_entropy(logits_per_text, labels)
-            loss = (loss_img + loss_txt) / 2
-
-            loss.backward()
-            optimizer.step()
-
-            total_loss += loss.item()
-
-        avg_loss = total_loss / len(train_loader)
+        avg_loss = total_loss / num_batches
         print(f"Epoch {epoch+1}/{epochs}, Average Loss: {avg_loss:.4f}")
 
     return model
 
 # Example setup
-# train_dataset = ImageTextDataset(train_image_paths, train_texts, processor)
-# val_dataset = ImageTextDataset(val_image_paths, val_texts, processor)
+# train_dataset = create_dataset_for_training(train_image_paths, train_texts, processor)
+# val_dataset = create_dataset_for_training(val_image_paths, val_texts, processor)
 # fine_tuned_model = fine_tune_clip(model, train_dataset, val_dataset)
 ```
 
@@ -430,18 +449,20 @@ def fine_tune_clip(model, train_dataset, val_dataset, epochs=5, lr=1e-5):
 def optimize_for_inference(model):
     """Optimize CLIP model for faster inference"""
 
-    # Set to evaluation mode
-    model.eval()
+    # Use mixed precision for faster inference
+    policy = tf.keras.mixed_precision.Policy('mixed_float16')
+    tf.keras.mixed_precision.set_global_policy(policy)
 
-    # Disable gradient computation
-    for param in model.parameters():
-        param.requires_grad = False
+    # Compile functions for better performance
+    @tf.function
+    def optimized_image_features(pixel_values):
+        return model.get_image_features(pixel_values=pixel_values)
 
-    # Use half precision if available
-    if torch.cuda.is_available():
-        model.half()
+    @tf.function
+    def optimized_text_features(input_ids):
+        return model.get_text_features(input_ids=input_ids)
 
-    return model
+    return optimized_image_features, optimized_text_features
 
 def benchmark_clip(model, processor, num_images=100, num_texts=100):
     """Benchmark CLIP performance"""
@@ -453,16 +474,14 @@ def benchmark_clip(model, processor, num_images=100, num_texts=100):
 
     # Benchmark image encoding
     start_time = time.time()
-    inputs = processor(images=dummy_images, return_tensors="pt")
-    with torch.no_grad():
-        image_features = model.get_image_features(**inputs)
+    inputs = processor(images=dummy_images, return_tensors="tf")
+    image_features = model.get_image_features(**inputs)
     image_time = time.time() - start_time
 
     # Benchmark text encoding
     start_time = time.time()
-    inputs = processor(text=dummy_texts, return_tensors="pt", padding=True)
-    with torch.no_grad():
-        text_features = model.get_text_features(**inputs)
+    inputs = processor(text=dummy_texts, return_tensors="tf", padding=True)
+    text_features = model.get_text_features(**inputs)
     text_time = time.time() - start_time
 
     print(f"Image encoding: {image_time:.4f}s for {num_images} images")
@@ -470,9 +489,21 @@ def benchmark_clip(model, processor, num_images=100, num_texts=100):
     print(f"Images per second: {num_images/image_time:.2f}")
     print(f"Texts per second: {num_texts/text_time:.2f}")
 
+    return image_time, text_time
+
 # Optimize and benchmark
-optimized_model = optimize_for_inference(model)
-benchmark_clip(optimized_model, processor)
+optimized_img_fn, optimized_txt_fn = optimize_for_inference(model)
+image_time, text_time = benchmark_clip(model, processor)
+
+# Convert to TensorFlow Lite for mobile deployment
+converter = tf.lite.TFLiteConverter.from_concrete_functions([
+    optimized_img_fn.get_concrete_function(tf.TensorSpec([None, 3, 224, 224], tf.float32))
+])
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+tflite_model = converter.convert()
+
+with open('clip_image_encoder.tflite', 'wb') as f:
+    f.write(tflite_model)
 ```
 
 ## 11. Integration with Vector Databases

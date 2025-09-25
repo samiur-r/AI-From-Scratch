@@ -4,168 +4,171 @@ Vision Transformer is a computer vision framework that applies transformer archi
 
 ### Installation
 ```bash
-# Install with transformers (Hugging Face)
-pip install transformers torch torchvision
-
-# Install with timm (PyTorch Image Models)
-pip install timm
-
-# For TensorFlow/Keras
+# Install with TensorFlow and transformers
 pip install tensorflow transformers
 
-# For JAX/Flax
-pip install flax transformers
+# For GPU support
+pip install tensorflow[and-cuda]
+
+# Additional utilities
+pip install pillow requests matplotlib scikit-learn
 ```
 
 ### Importing Vision Transformer
 ```python
-# Hugging Face Transformers
-from transformers import ViTImageProcessor, ViTForImageClassification
-import torch
-
-# PyTorch Image Models (timm)
-import timm
-
-# TensorFlow/Keras
+# TensorFlow/Keras with Transformers
 import tensorflow as tf
-from transformers import TFViTForImageClassification
+from transformers import TFViTForImageClassification, ViTImageProcessor
+
+# Core TensorFlow
+from tensorflow.keras.applications import imagenet_utils
+from tensorflow.keras.preprocessing import image
+from PIL import Image
+import numpy as np
 ```
 
 * * * * *
 
 ## 1. Loading Pre-trained Models
 ```python
-# Using Hugging Face Transformers
+# Using TensorFlow with Hugging Face Transformers
 processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224')
-model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224')
-
-# Using timm
-model = timm.create_model('vit_base_patch16_224', pretrained=True)
-model.eval()
+model = TFViTForImageClassification.from_pretrained('google/vit-base-patch16-224')
 
 # Available model variants
-# vit-tiny-patch16-224 (5.7M params)
-# vit-small-patch16-224 (22M params)
-# vit-base-patch16-224 (86M params)
-# vit-large-patch16-224 (307M params)
-# vit-huge-patch14-224 (632M params)
+# google/vit-tiny-patch16-224 (5.7M params)
+# google/vit-small-patch16-224 (22M params)
+# google/vit-base-patch16-224 (86M params)
+# google/vit-large-patch16-224 (307M params)
+
+# Load specific model size
+model_small = TFViTForImageClassification.from_pretrained('google/vit-small-patch16-224')
+model_large = TFViTForImageClassification.from_pretrained('google/vit-large-patch16-224')
+
+print(f"Model loaded with {model.num_parameters():,} parameters")
 ```
 
 ## 2. Basic Image Classification
 ```python
-from PIL import Image
 import requests
 
 # Load and preprocess image
 url = "http://images.cocodataset.org/val2017/000000039769.jpg"
 image = Image.open(requests.get(url, stream=True).raw)
 
-# Using Hugging Face
-inputs = processor(images=image, return_tensors="pt")
-with torch.no_grad():
-    logits = model(**inputs).logits
-    predicted_class_idx = logits.argmax(-1).item()
-    print(f"Predicted class: {model.config.id2label[predicted_class_idx]}")
+# Process image with ViT processor
+inputs = processor(images=image, return_tensors="tf")
 
-# Using timm
-transform = timm.data.resolve_data_config({}, model=model)
-transform = timm.data.create_transform(**transform)
+# Make prediction
+outputs = model(**inputs)
+logits = outputs.logits
 
-input_tensor = transform(image).unsqueeze(0)
-with torch.no_grad():
-    output = model(input_tensor)
-    probabilities = torch.nn.functional.softmax(output[0], dim=0)
-    top5_prob, top5_catid = torch.topk(probabilities, 5)
+# Get predicted class
+predicted_class_idx = tf.argmax(logits, axis=-1)[0]
+predicted_class = model.config.id2label[int(predicted_class_idx)]
 
-    for i in range(5):
-        print(f"{top5_catid[i].item()}: {top5_prob[i].item():.4f}")
+print(f"Predicted class: {predicted_class}")
+
+# Get top-5 predictions with probabilities
+probabilities = tf.nn.softmax(logits[0])
+top5_indices = tf.nn.top_k(probabilities, k=5).indices
+
+print("\nTop-5 predictions:")
+for i in range(5):
+    class_idx = int(top5_indices[i])
+    class_name = model.config.id2label[class_idx]
+    probability = float(probabilities[class_idx])
+    print(f"{class_name}: {probability:.4f}")
 ```
 
 ## 3. Fine-tuning on Custom Dataset
 ```python
-from transformers import ViTImageProcessor, ViTForImageClassification, TrainingArguments, Trainer
-from torch.utils.data import Dataset
+from tensorflow.keras.utils import to_categorical
+from sklearn.model_selection import train_test_split
+import tensorflow as tf
 
-class CustomImageDataset(Dataset):
-    def __init__(self, images, labels, processor):
-        self.images = images
-        self.labels = labels
-        self.processor = processor
+def create_dataset(images, labels, processor, batch_size=16):
+    """Create TensorFlow dataset for training"""
 
-    def __len__(self):
-        return len(self.images)
+    def preprocess_function(image, label):
+        # Process image using ViT processor
+        inputs = processor(images=image, return_tensors="tf")
+        return inputs['pixel_values'][0], label
 
-    def __getitem__(self, idx):
-        image = self.images[idx]
-        label = self.labels[idx]
+    # Create dataset
+    dataset = tf.data.Dataset.from_tensor_slices((images, labels))
+    dataset = dataset.map(preprocess_function, num_parallel_calls=tf.data.AUTOTUNE)
+    dataset = dataset.batch(batch_size)
+    dataset = dataset.prefetch(tf.data.AUTOTUNE)
 
-        encoding = self.processor(image, return_tensors="pt")
-        encoding = {k: v.squeeze() for k, v in encoding.items()}
-        encoding["labels"] = torch.tensor(label, dtype=torch.long)
-
-        return encoding
+    return dataset
 
 # Setup for fine-tuning
 processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224')
-model = ViTForImageClassification.from_pretrained(
+model = TFViTForImageClassification.from_pretrained(
     'google/vit-base-patch16-224',
     num_labels=num_classes,  # Your number of classes
     ignore_mismatched_sizes=True
 )
 
-# Create datasets
-train_dataset = CustomImageDataset(train_images, train_labels, processor)
-val_dataset = CustomImageDataset(val_images, val_labels, processor)
+# Prepare datasets
+train_dataset = create_dataset(train_images, train_labels, processor, batch_size=16)
+val_dataset = create_dataset(val_images, val_labels, processor, batch_size=16)
 
-# Training arguments
-training_args = TrainingArguments(
-    output_dir="./vit-finetuned",
-    per_device_train_batch_size=16,
-    per_device_eval_batch_size=16,
-    num_train_epochs=3,
-    learning_rate=5e-5,
-    logging_steps=10,
-    evaluation_strategy="epoch",
-    save_strategy="epoch",
-    load_best_model_at_end=True,
+# Compile model
+optimizer = tf.keras.optimizers.Adam(learning_rate=5e-5)
+model.compile(
+    optimizer=optimizer,
+    loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+    metrics=['accuracy']
 )
 
-# Create trainer and train
-trainer = Trainer(
-    model=model,
-    args=training_args,
-    train_dataset=train_dataset,
-    eval_dataset=val_dataset,
+# Setup callbacks
+callbacks = [
+    tf.keras.callbacks.EarlyStopping(patience=3, restore_best_weights=True),
+    tf.keras.callbacks.ReduceLROnPlateau(factor=0.5, patience=2)
+]
+
+# Fine-tune model
+history = model.fit(
+    train_dataset,
+    epochs=10,
+    validation_data=val_dataset,
+    callbacks=callbacks
 )
 
-trainer.train()
+# Save fine-tuned model
+model.save_pretrained('./vit-finetuned')
 ```
 
 ## 4. Feature Extraction and Embeddings
 ```python
-# Extract features before classification head
-model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224')
-
-# Remove classification head for feature extraction
-feature_extractor = model.vit
+# Load model for feature extraction
+model = TFViTForImageClassification.from_pretrained('google/vit-base-patch16-224')
 
 # Process image
-inputs = processor(images=image, return_tensors="pt")
+inputs = processor(images=image, return_tensors="tf")
 
-with torch.no_grad():
-    outputs = feature_extractor(**inputs)
+# Extract features using the ViT backbone
+outputs = model.vit(**inputs)
 
-    # Get patch embeddings (sequence_length x hidden_size)
-    patch_embeddings = outputs.last_hidden_state
+# Get patch embeddings (sequence_length x hidden_size)
+patch_embeddings = outputs.last_hidden_state
 
-    # Get CLS token embedding (global image representation)
-    cls_embedding = patch_embeddings[:, 0]  # First token is [CLS]
+# Get CLS token embedding (global image representation)
+cls_embedding = patch_embeddings[:, 0]  # First token is [CLS]
 
-    # Get patch tokens (spatial features)
-    patch_tokens = patch_embeddings[:, 1:]  # Remaining tokens are patches
+# Get patch tokens (spatial features)
+patch_tokens = patch_embeddings[:, 1:]  # Remaining tokens are patches
 
 print(f"CLS embedding shape: {cls_embedding.shape}")
 print(f"Patch embeddings shape: {patch_tokens.shape}")
+
+# Save embeddings for later use
+tf.saved_model.save({
+    'cls_embedding': cls_embedding,
+    'patch_tokens': patch_tokens
+}, 'vit_features')
 ```
 
 ## 5. Attention Visualization
@@ -174,13 +177,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Get attention weights
-model.eval()
-with torch.no_grad():
-    outputs = model.vit(**inputs, output_attentions=True)
-    attentions = outputs.attentions  # List of attention matrices
+outputs = model.vit(**inputs, output_attentions=True)
+attentions = outputs.attentions  # List of attention matrices
 
 # Visualize attention from last layer, first head
-last_layer_attention = attentions[-1][0, 0].cpu().numpy()  # [seq_len, seq_len]
+last_layer_attention = attentions[-1][0, 0].numpy()  # [seq_len, seq_len]
 
 # Attention from CLS token to patches
 cls_attention = last_layer_attention[0, 1:]  # Remove CLS to CLS attention
@@ -228,18 +229,19 @@ config = ViTConfig(
 )
 
 # Create model with custom config
-custom_model = ViTForImageClassification(config)
+custom_model = TFViTForImageClassification(config)
 
 # Or modify existing model
-model = ViTForImageClassification.from_pretrained('google/vit-base-patch16-224')
+model = TFViTForImageClassification.from_pretrained('google/vit-base-patch16-224')
 
 # Freeze backbone and only train classification head
-for param in model.vit.parameters():
-    param.requires_grad = False
+for layer in model.vit.layers:
+    layer.trainable = False
 
-# Only classification head parameters will be updated
-for param in model.classifier.parameters():
-    param.requires_grad = True
+# Only classification head will be updated
+model.classifier.trainable = True
+
+print(f"Trainable parameters: {model.count_params()}")
 ```
 
 ## 7. Batch Processing and Inference Optimization
@@ -248,87 +250,114 @@ for param in model.classifier.parameters():
 images_batch = [image1, image2, image3, image4]  # List of PIL Images
 
 # Process batch
-inputs = processor(images=images_batch, return_tensors="pt")
+inputs = processor(images=images_batch, return_tensors="tf")
 
-with torch.no_grad():
-    outputs = model(**inputs)
-    predictions = torch.nn.functional.softmax(outputs.logits, dim=-1)
+# Make batch predictions
+outputs = model(**inputs)
+predictions = tf.nn.softmax(outputs.logits, axis=-1)
 
 # Get top predictions for each image
 for i, pred in enumerate(predictions):
-    top5_prob, top5_idx = torch.topk(pred, 5)
+    top5_values, top5_indices = tf.nn.top_k(pred, k=5)
     print(f"Image {i+1} top predictions:")
     for j in range(5):
-        class_name = model.config.id2label[top5_idx[j].item()]
-        probability = top5_prob[j].item()
+        class_idx = int(top5_indices[j])
+        class_name = model.config.id2label[class_idx]
+        probability = float(top5_values[j])
         print(f"  {class_name}: {probability:.4f}")
 
-# Optimize for inference
-model.eval()
-torch.set_grad_enabled(False)
+# Optimize for inference with mixed precision
+policy = tf.keras.mixed_precision.Policy('mixed_float16')
+tf.keras.mixed_precision.set_global_policy(policy)
 
-# Use half precision for faster inference
-model.half()
-inputs = {k: v.half() if v.dtype == torch.float32 else v for k, v in inputs.items()}
+# Convert to TensorFlow Lite for mobile deployment
+converter = tf.lite.TFLiteConverter.from_concrete_functions([model.call.get_concrete_function(inputs)])
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+tflite_model = converter.convert()
+
+# Save TFLite model
+with open('vit_model.tflite', 'wb') as f:
+    f.write(tflite_model)
 ```
 
 ## 8. Integration with Other Frameworks
 ```python
-# Export to ONNX
-import torch.onnx
+# Export to SavedModel format
+tf.saved_model.save(model, "vit_savedmodel")
 
-dummy_input = torch.randn(1, 3, 224, 224)
-torch.onnx.export(
-    model,
-    dummy_input,
-    "vit_model.onnx",
-    export_params=True,
-    opset_version=11,
-    do_constant_folding=True,
-    input_names=['input'],
-    output_names=['output']
-)
+# Load SavedModel
+loaded_model = tf.saved_model.load("vit_savedmodel")
 
-# Use with TensorFlow
-tf_model = TFViTForImageClassification.from_pretrained('google/vit-base-patch16-224')
+# Convert to TensorFlow Lite
+converter = tf.lite.TFLiteConverter.from_saved_model("vit_savedmodel")
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+tflite_model = converter.convert()
 
-# Convert PIL image to TensorFlow tensor
-import tensorflow as tf
-from transformers import ViTImageProcessor
+with open('vit_model.tflite', 'wb') as f:
+    f.write(tflite_model)
 
-processor = ViTImageProcessor.from_pretrained('google/vit-base-patch16-224')
-inputs = processor(images=image, return_tensors="tf")
+# Use TFLite model for inference
+interpreter = tf.lite.Interpreter(model_content=tflite_model)
+interpreter.allocate_tensors()
 
-outputs = tf_model(**inputs)
-predictions = tf.nn.softmax(outputs.logits, axis=-1)
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+
+# Set input tensor
+input_data = inputs['pixel_values'].numpy().astype(np.float32)
+interpreter.set_tensor(input_details[0]['index'], input_data)
+
+# Run inference
+interpreter.invoke()
+
+# Get output
+output_data = interpreter.get_tensor(output_details[0]['index'])
+predictions = tf.nn.softmax(output_data, axis=-1)
 ```
 
 ## 9. Data Augmentation for ViT
 ```python
-from torchvision import transforms
-import timm.data.transforms as timm_transforms
+import tensorflow as tf
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 # Standard augmentation pipeline for ViT
-transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.RandomHorizontalFlip(p=0.5),
-    transforms.RandomRotation(degrees=15),
-    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-])
+def create_augmentation_pipeline():
+    return ImageDataGenerator(
+        rotation_range=15,
+        width_shift_range=0.1,
+        height_shift_range=0.1,
+        horizontal_flip=True,
+        brightness_range=[0.8, 1.2],
+        zoom_range=0.1,
+        fill_mode='nearest',
+        preprocessing_function=tf.keras.applications.imagenet_utils.preprocess_input
+    )
 
-# Advanced augmentations (RandAugment, AutoAugment)
-from timm.data import create_transform
+# Advanced augmentations using tf.image
+@tf.function
+def augment_image(image):
+    # Random horizontal flip
+    image = tf.image.random_flip_left_right(image)
 
-transform = create_transform(
-    input_size=224,
-    is_training=True,
-    auto_augment='rand-m9-mstd0.5-inc1',
-    interpolation='bicubic',
-    re_prob=0.25,
-    re_mode='pixel',
-    re_count=1,
+    # Random rotation
+    image = tf.image.rot90(image, k=tf.random.uniform([], 0, 4, dtype=tf.int32))
+
+    # Random brightness and contrast
+    image = tf.image.random_brightness(image, max_delta=0.2)
+    image = tf.image.random_contrast(image, lower=0.8, upper=1.2)
+
+    # Random saturation
+    image = tf.image.random_saturation(image, lower=0.8, upper=1.2)
+
+    # Normalize to [0, 1]
+    image = tf.cast(image, tf.float32) / 255.0
+
+    return image
+
+# Apply augmentation to dataset
+augmented_dataset = train_dataset.map(
+    lambda x, y: (augment_image(x), y),
+    num_parallel_calls=tf.data.AUTOTUNE
 )
 ```
 
@@ -337,30 +366,29 @@ transform = create_transform(
 import time
 from sklearn.metrics import accuracy_score, classification_report
 
-def evaluate_model_performance(model, test_loader, device='cuda'):
-    model.eval()
+def evaluate_model_performance(model, test_dataset):
     all_predictions = []
     all_labels = []
     total_time = 0
+    batch_count = 0
 
-    with torch.no_grad():
-        for batch in test_loader:
-            inputs = batch['pixel_values'].to(device)
-            labels = batch['labels'].to(device)
+    for batch in test_dataset:
+        inputs, labels = batch
 
-            start_time = time.time()
-            outputs = model(inputs)
-            end_time = time.time()
+        start_time = time.time()
+        outputs = model(inputs, training=False)
+        end_time = time.time()
 
-            total_time += (end_time - start_time)
+        total_time += (end_time - start_time)
+        batch_count += 1
 
-            predictions = torch.argmax(outputs.logits, dim=-1)
-            all_predictions.extend(predictions.cpu().numpy())
-            all_labels.extend(labels.cpu().numpy())
+        predictions = tf.argmax(outputs.logits, axis=-1)
+        all_predictions.extend(predictions.numpy())
+        all_labels.extend(labels.numpy())
 
     # Calculate metrics
     accuracy = accuracy_score(all_labels, all_predictions)
-    avg_inference_time = total_time / len(test_loader)
+    avg_inference_time = total_time / batch_count
 
     print(f"Accuracy: {accuracy:.4f}")
     print(f"Average inference time per batch: {avg_inference_time:.4f} seconds")
@@ -379,8 +407,12 @@ models_to_test = [
 
 for model_name in models_to_test:
     print(f"\nEvaluating {model_name}:")
-    model = ViTForImageClassification.from_pretrained(model_name)
-    accuracy, inference_time = evaluate_model_performance(model, test_loader)
+    model = TFViTForImageClassification.from_pretrained(model_name)
+    accuracy, inference_time = evaluate_model_performance(model, test_dataset)
+
+    # Memory usage
+    model_size = model.count_params()
+    print(f"Model parameters: {model_size:,}")
 ```
 
 * * * * *
