@@ -180,319 +180,443 @@ The network outputs a segmentation mask where each pixel is classified into one 
 ```python
 # What's happening: Loading and preprocessing medical image dataset
 # Why this step: U-Net requires paired input images and segmentation masks
-import torch
-import torch.nn as nn
-import torchvision.transforms as transforms
-from torch.utils.data import Dataset, DataLoader
-import cv2
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
 import numpy as np
-from PIL import Image
+import cv2
 import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+import os
+import glob
 
-class SegmentationDataset(Dataset):
-    def __init__(self, image_paths, mask_paths, transform=None):
-        self.image_paths = image_paths
-        self.mask_paths = mask_paths
-        self.transform = transform
+def load_data(image_dir, mask_dir, img_size=(256, 256)):
+    """Load and preprocess images and masks"""
+    image_paths = sorted(glob.glob(os.path.join(image_dir, "*.jpg")))
+    mask_paths = sorted(glob.glob(os.path.join(mask_dir, "*.png")))
 
-    def __len__(self):
-        return len(self.image_paths)
+    images = []
+    masks = []
 
-    def __getitem__(self, idx):
-        # Load image and mask
-        image = Image.open(self.image_paths[idx]).convert('RGB')
-        mask = Image.open(self.mask_paths[idx]).convert('L')
+    for img_path, mask_path in zip(image_paths, mask_paths):
+        # Load image
+        img = cv2.imread(img_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = cv2.resize(img, img_size)
+        img = img.astype(np.float32) / 255.0
 
-        if self.transform:
-            image = self.transform(image)
-            mask = self.transform(mask)
+        # Load mask
+        mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+        mask = cv2.resize(mask, img_size)
+        mask = mask.astype(np.float32) / 255.0
+        mask = np.expand_dims(mask, axis=-1)
 
-        return image, mask
+        images.append(img)
+        masks.append(mask)
 
-# Define transformations
-transform = transforms.Compose([
-    transforms.Resize((256, 256)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-])
+    return np.array(images), np.array(masks)
 
-# What's happening: Creating data loaders with augmentation
+# What's happening: Creating data generators with augmentation
 # Why this step: Data augmentation is crucial for U-Net to generalize well
-train_dataset = SegmentationDataset(train_images, train_masks, transform=transform)
-val_dataset = SegmentationDataset(val_images, val_masks, transform=transform)
+def create_data_generator(images, masks, batch_size=8, augment=True):
+    """Create data generator with augmentation"""
+    if augment:
+        data_gen_args = dict(
+            rotation_range=20,
+            width_shift_range=0.1,
+            height_shift_range=0.1,
+            horizontal_flip=True,
+            zoom_range=0.1,
+            fill_mode='nearest'
+        )
 
-train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False)
+        image_datagen = tf.keras.preprocessing.image.ImageDataGenerator(**data_gen_args)
+        mask_datagen = tf.keras.preprocessing.image.ImageDataGenerator(**data_gen_args)
+
+        # Ensure same random transformations for images and masks
+        seed = 42
+        image_generator = image_datagen.flow(images, batch_size=batch_size, seed=seed)
+        mask_generator = mask_datagen.flow(masks, batch_size=batch_size, seed=seed)
+
+        return zip(image_generator, mask_generator)
+    else:
+        dataset = tf.data.Dataset.from_tensor_slices((images, masks))
+        dataset = dataset.batch(batch_size)
+        return dataset
+
+# Load data
+X, y = load_data('path/to/images', 'path/to/masks')
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+
+print(f"Training data shape: {X_train.shape}, {y_train.shape}")
+print(f"Validation data shape: {X_val.shape}, {y_val.shape}")
 ```
 
 ### Step 2: Model Architecture
 ```python
 # What's happening: Implementing U-Net architecture with encoder-decoder structure
 # Why this architecture: Skip connections preserve spatial information during upsampling
-class UNet(nn.Module):
-    def __init__(self, n_channels=3, n_classes=1):
-        super(UNet, self).__init__()
 
-        # Encoder (Contracting Path)
-        self.enc1 = self.conv_block(n_channels, 64)
-        self.pool1 = nn.MaxPool2d(2)
+def conv_block(inputs, num_filters):
+    """Standard convolution block with batch normalization and activation"""
+    x = layers.Conv2D(num_filters, 3, padding="same")(inputs)
+    x = layers.BatchNormalization()(x)
+    x = layers.Activation("relu")(x)
 
-        self.enc2 = self.conv_block(64, 128)
-        self.pool2 = nn.MaxPool2d(2)
+    x = layers.Conv2D(num_filters, 3, padding="same")(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Activation("relu")(x)
 
-        self.enc3 = self.conv_block(128, 256)
-        self.pool3 = nn.MaxPool2d(2)
+    return x
 
-        self.enc4 = self.conv_block(256, 512)
-        self.pool4 = nn.MaxPool2d(2)
+def encoder_block(inputs, num_filters):
+    """Encoder block with convolution and max pooling"""
+    x = conv_block(inputs, num_filters)
+    p = layers.MaxPool2D((2, 2))(x)
+    return x, p
 
-        # Bottleneck
-        self.bottleneck = self.conv_block(512, 1024)
+def decoder_block(inputs, skip_features, num_filters):
+    """Decoder block with upsampling and skip connection"""
+    x = layers.Conv2DTranspose(num_filters, (2, 2), strides=2, padding="same")(inputs)
+    x = layers.Concatenate()([x, skip_features])  # Skip connection
+    x = conv_block(x, num_filters)
+    return x
 
-        # Decoder (Expanding Path)
-        self.upconv4 = nn.ConvTranspose2d(1024, 512, kernel_size=2, stride=2)
-        self.dec4 = self.conv_block(1024, 512)  # 1024 = 512 (upconv) + 512 (skip)
+def build_unet(input_shape=(256, 256, 3), num_classes=1):
+    """Build U-Net model"""
+    inputs = layers.Input(input_shape)
 
-        self.upconv3 = nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
-        self.dec3 = self.conv_block(512, 256)
+    # Encoder (Contracting Path)
+    s1, p1 = encoder_block(inputs, 64)
+    s2, p2 = encoder_block(p1, 128)
+    s3, p3 = encoder_block(p2, 256)
+    s4, p4 = encoder_block(p3, 512)
 
-        self.upconv2 = nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
-        self.dec2 = self.conv_block(256, 128)
+    # Bottleneck
+    b1 = conv_block(p4, 1024)
 
-        self.upconv1 = nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
-        self.dec1 = self.conv_block(128, 64)
+    # Decoder (Expanding Path)
+    d1 = decoder_block(b1, s4, 512)
+    d2 = decoder_block(d1, s3, 256)
+    d3 = decoder_block(d2, s2, 128)
+    d4 = decoder_block(d3, s1, 64)
 
-        # Final convolution
-        self.final_conv = nn.Conv2d(64, n_classes, kernel_size=1)
+    # Output layer
+    if num_classes == 1:
+        outputs = layers.Conv2D(1, 1, padding="same", activation="sigmoid")(d4)
+    else:
+        outputs = layers.Conv2D(num_classes, 1, padding="same", activation="softmax")(d4)
 
-    def conv_block(self, in_channels, out_channels):
-        return nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True)
-        )
+    model = keras.Model(inputs, outputs, name="U-Net")
+    return model
 
-    def forward(self, x):
-        # Encoder
-        enc1 = self.enc1(x)
-        enc2 = self.enc2(self.pool1(enc1))
-        enc3 = self.enc3(self.pool2(enc2))
-        enc4 = self.enc4(self.pool3(enc3))
-
-        # Bottleneck
-        bottleneck = self.bottleneck(self.pool4(enc4))
-
-        # Decoder with skip connections
-        dec4 = self.upconv4(bottleneck)
-        dec4 = torch.cat([dec4, enc4], dim=1)  # Skip connection
-        dec4 = self.dec4(dec4)
-
-        dec3 = self.upconv3(dec4)
-        dec3 = torch.cat([dec3, enc3], dim=1)  # Skip connection
-        dec3 = self.dec3(dec3)
-
-        dec2 = self.upconv2(dec3)
-        dec2 = torch.cat([dec2, enc2], dim=1)  # Skip connection
-        dec2 = self.dec2(dec2)
-
-        dec1 = self.upconv1(dec2)
-        dec1 = torch.cat([dec1, enc1], dim=1)  # Skip connection
-        dec1 = self.dec1(dec1)
-
-        # Final output
-        return torch.sigmoid(self.final_conv(dec1))
-
-# What's happening: Initializing model and moving to GPU
+# What's happening: Building and compiling the model
 # Why these parameters: Standard U-Net configuration for binary segmentation
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = UNet(n_channels=3, n_classes=1).to(device)
+model = build_unet(input_shape=(256, 256, 3), num_classes=1)
+model.summary()
 ```
 
 ### Step 3: Training Configuration
 ```python
 # What's happening: Setting up training components with appropriate loss function
 # Why these choices: Dice loss handles class imbalance better than cross-entropy
-import torch.optim as optim
 
-class DiceLoss(nn.Module):
-    def __init__(self, smooth=1e-6):
-        super(DiceLoss, self).__init__()
-        self.smooth = smooth
+def dice_coefficient(y_true, y_pred, smooth=1e-6):
+    """Dice coefficient metric for segmentation"""
+    y_true_f = tf.cast(tf.reshape(y_true, [-1]), tf.float32)
+    y_pred_f = tf.cast(tf.reshape(y_pred, [-1]), tf.float32)
 
-    def forward(self, predictions, targets):
-        predictions = predictions.view(-1)
-        targets = targets.view(-1)
+    intersection = tf.reduce_sum(y_true_f * y_pred_f)
+    return (2. * intersection + smooth) / (tf.reduce_sum(y_true_f) + tf.reduce_sum(y_pred_f) + smooth)
 
-        intersection = (predictions * targets).sum()
-        dice = (2. * intersection + self.smooth) / (predictions.sum() + targets.sum() + self.smooth)
+def dice_loss(y_true, y_pred):
+    """Dice loss function"""
+    return 1 - dice_coefficient(y_true, y_pred)
 
-        return 1 - dice
+def combined_loss(y_true, y_pred):
+    """Combined binary crossentropy and dice loss"""
+    bce = tf.keras.losses.binary_crossentropy(y_true, y_pred)
+    dice = dice_loss(y_true, y_pred)
+    return bce + dice
 
-# Setup training components
-criterion = DiceLoss()
-optimizer = optim.Adam(model.parameters(), lr=1e-4)
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, factor=0.5)
+def iou_metric(y_true, y_pred, threshold=0.5):
+    """Intersection over Union metric"""
+    y_pred_binary = tf.cast(y_pred > threshold, tf.float32)
+    y_true_binary = tf.cast(y_true, tf.float32)
 
-# Training metrics tracking
-def dice_coefficient(predictions, targets, threshold=0.5):
-    predictions = (predictions > threshold).float()
-    targets = targets.float()
+    intersection = tf.reduce_sum(y_true_binary * y_pred_binary)
+    union = tf.reduce_sum(y_true_binary) + tf.reduce_sum(y_pred_binary) - intersection
 
-    intersection = (predictions * targets).sum()
-    return (2. * intersection) / (predictions.sum() + targets.sum())
+    return intersection / (union + 1e-6)
+
+# Compile model with custom loss and metrics
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
+    loss=combined_loss,
+    metrics=[dice_coefficient, iou_metric, 'binary_accuracy']
+)
+
+# Callbacks for training
+callbacks = [
+    tf.keras.callbacks.ModelCheckpoint(
+        'best_unet_model.h5',
+        monitor='val_dice_coefficient',
+        mode='max',
+        save_best_only=True,
+        verbose=1
+    ),
+    tf.keras.callbacks.ReduceLROnPlateau(
+        monitor='val_loss',
+        factor=0.5,
+        patience=10,
+        min_lr=1e-7,
+        verbose=1
+    ),
+    tf.keras.callbacks.EarlyStopping(
+        monitor='val_dice_coefficient',
+        mode='max',
+        patience=20,
+        restore_best_weights=True,
+        verbose=1
+    )
+]
 ```
 
 ### Step 4: Training Loop
 ```python
 # What's happening: Training the model with validation monitoring
 # What the algorithm is learning: Pixel-wise classification with spatial consistency
-def train_model(model, train_loader, val_loader, epochs=100):
-    best_val_dice = 0.0
 
-    for epoch in range(epochs):
-        # Training phase
-        model.train()
-        train_loss = 0.0
-        train_dice = 0.0
+# Create training and validation datasets
+train_dataset = tf.data.Dataset.from_tensor_slices((X_train, y_train))
+train_dataset = train_dataset.shuffle(1000).batch(8).prefetch(tf.data.AUTOTUNE)
 
-        for batch_idx, (images, masks) in enumerate(train_loader):
-            images, masks = images.to(device), masks.to(device)
+val_dataset = tf.data.Dataset.from_tensor_slices((X_val, y_val))
+val_dataset = val_dataset.batch(8).prefetch(tf.data.AUTOTUNE)
 
-            optimizer.zero_grad()
-            outputs = model(images)
-            loss = criterion(outputs, masks)
-            loss.backward()
-            optimizer.step()
+# Train the model
+history = model.fit(
+    train_dataset,
+    epochs=100,
+    validation_data=val_dataset,
+    callbacks=callbacks,
+    verbose=1
+)
 
-            train_loss += loss.item()
-            train_dice += dice_coefficient(outputs, masks).item()
+# Plot training history
+def plot_training_history(history):
+    """Plot training and validation metrics"""
+    fig, axes = plt.subplots(2, 2, figsize=(15, 10))
 
-        # Validation phase
-        model.eval()
-        val_loss = 0.0
-        val_dice = 0.0
+    # Loss
+    axes[0, 0].plot(history.history['loss'], label='Training Loss')
+    axes[0, 0].plot(history.history['val_loss'], label='Validation Loss')
+    axes[0, 0].set_title('Model Loss')
+    axes[0, 0].set_xlabel('Epoch')
+    axes[0, 0].set_ylabel('Loss')
+    axes[0, 0].legend()
 
-        with torch.no_grad():
-            for images, masks in val_loader:
-                images, masks = images.to(device), masks.to(device)
-                outputs = model(images)
-                loss = criterion(outputs, masks)
+    # Dice coefficient
+    axes[0, 1].plot(history.history['dice_coefficient'], label='Training Dice')
+    axes[0, 1].plot(history.history['val_dice_coefficient'], label='Validation Dice')
+    axes[0, 1].set_title('Dice Coefficient')
+    axes[0, 1].set_xlabel('Epoch')
+    axes[0, 1].set_ylabel('Dice Score')
+    axes[0, 1].legend()
 
-                val_loss += loss.item()
-                val_dice += dice_coefficient(outputs, masks).item()
+    # IoU
+    axes[1, 0].plot(history.history['iou_metric'], label='Training IoU')
+    axes[1, 0].plot(history.history['val_iou_metric'], label='Validation IoU')
+    axes[1, 0].set_title('IoU Metric')
+    axes[1, 0].set_xlabel('Epoch')
+    axes[1, 0].set_ylabel('IoU')
+    axes[1, 0].legend()
 
-        # Calculate averages
-        train_loss /= len(train_loader)
-        train_dice /= len(train_loader)
-        val_loss /= len(val_loader)
-        val_dice /= len(val_loader)
+    # Accuracy
+    axes[1, 1].plot(history.history['binary_accuracy'], label='Training Accuracy')
+    axes[1, 1].plot(history.history['val_binary_accuracy'], label='Validation Accuracy')
+    axes[1, 1].set_title('Binary Accuracy')
+    axes[1, 1].set_xlabel('Epoch')
+    axes[1, 1].set_ylabel('Accuracy')
+    axes[1, 1].legend()
 
-        # Learning rate scheduling
-        scheduler.step(val_loss)
+    plt.tight_layout()
+    plt.show()
 
-        # Save best model
-        if val_dice > best_val_dice:
-            best_val_dice = val_dice
-            torch.save(model.state_dict(), 'best_unet_model.pth')
-
-        print(f'Epoch {epoch+1}/{epochs}:')
-        print(f'  Train Loss: {train_loss:.4f}, Train Dice: {train_dice:.4f}')
-        print(f'  Val Loss: {val_loss:.4f}, Val Dice: {val_dice:.4f}')
-
-# Start training
-train_model(model, train_loader, val_loader, epochs=100)
+# Plot training results
+plot_training_history(history)
 ```
 
 ### Step 5: Evaluation
 ```python
 # What's happening: Comprehensive model evaluation with multiple metrics
 # How to interpret results: Dice > 0.8 indicates good segmentation performance
-def evaluate_model(model, test_loader):
-    model.eval()
+
+# Load best model
+best_model = tf.keras.models.load_model(
+    'best_unet_model.h5',
+    custom_objects={
+        'combined_loss': combined_loss,
+        'dice_coefficient': dice_coefficient,
+        'iou_metric': iou_metric
+    }
+)
+
+def evaluate_model(model, X_test, y_test):
+    """Evaluate model on test set"""
+    predictions = model.predict(X_test)
+
     dice_scores = []
     iou_scores = []
 
-    with torch.no_grad():
-        for images, masks in test_loader:
-            images, masks = images.to(device), masks.to(device)
-            outputs = model(images)
+    for i in range(len(X_test)):
+        y_true = y_test[i]
+        y_pred = predictions[i]
 
-            # Calculate metrics
-            dice = dice_coefficient(outputs, masks)
-            dice_scores.append(dice.item())
+        # Calculate Dice score
+        dice = dice_coefficient(y_true, y_pred).numpy()
+        dice_scores.append(dice)
 
-            # IoU calculation
-            predictions = (outputs > 0.5).float()
-            intersection = (predictions * masks).sum()
-            union = predictions.sum() + masks.sum() - intersection
-            iou = intersection / (union + 1e-6)
-            iou_scores.append(iou.item())
+        # Calculate IoU
+        iou = iou_metric(y_true, y_pred).numpy()
+        iou_scores.append(iou)
 
     print(f'Average Dice Score: {np.mean(dice_scores):.4f} ± {np.std(dice_scores):.4f}')
     print(f'Average IoU Score: {np.mean(iou_scores):.4f} ± {np.std(iou_scores):.4f}')
 
-    return dice_scores, iou_scores
+    return dice_scores, iou_scores, predictions
 
-# Load best model and evaluate
-model.load_state_dict(torch.load('best_unet_model.pth'))
-dice_scores, iou_scores = evaluate_model(model, val_loader)
+# Evaluate on validation set
+dice_scores, iou_scores, predictions = evaluate_model(best_model, X_val, y_val)
+
+# Calculate additional metrics
+def calculate_pixel_accuracy(y_true, y_pred, threshold=0.5):
+    """Calculate pixel-wise accuracy"""
+    y_pred_binary = (y_pred > threshold).astype(np.float32)
+    y_true_binary = y_true.astype(np.float32)
+
+    correct_pixels = np.sum(y_pred_binary == y_true_binary)
+    total_pixels = y_true_binary.size
+
+    return correct_pixels / total_pixels
+
+# Calculate pixel accuracy for all predictions
+pixel_accuracies = []
+for i in range(len(predictions)):
+    accuracy = calculate_pixel_accuracy(y_val[i], predictions[i])
+    pixel_accuracies.append(accuracy)
+
+print(f'Average Pixel Accuracy: {np.mean(pixel_accuracies):.4f} ± {np.std(pixel_accuracies):.4f}')
 ```
 
 ### Step 6: Prediction and Visualization
 ```python
 # What's happening: Making predictions on new images and visualizing results
 # How to use in practice: Apply post-processing for cleaner segmentation masks
+
 def predict_and_visualize(model, image_path, threshold=0.5):
-    model.eval()
-
+    """Make prediction and visualize results"""
     # Load and preprocess image
-    image = Image.open(image_path).convert('RGB')
-    original_size = image.size
+    image = cv2.imread(image_path)
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    original_size = image_rgb.shape[:2]
 
-    transform = transforms.Compose([
-        transforms.Resize((256, 256)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
-
-    input_tensor = transform(image).unsqueeze(0).to(device)
+    # Preprocess for model
+    image_resized = cv2.resize(image_rgb, (256, 256))
+    image_normalized = image_resized.astype(np.float32) / 255.0
+    input_array = np.expand_dims(image_normalized, axis=0)
 
     # Make prediction
-    with torch.no_grad():
-        output = model(input_tensor)
-        prediction = (output > threshold).float().cpu().numpy()
+    prediction = model.predict(input_array)[0]
+    prediction_binary = (prediction > threshold).astype(np.uint8)
 
     # Resize prediction back to original size
-    prediction = cv2.resize(prediction[0, 0], original_size, interpolation=cv2.INTER_NEAREST)
+    prediction_resized = cv2.resize(prediction_binary[:,:,0], (original_size[1], original_size[0]),
+                                  interpolation=cv2.INTER_NEAREST)
 
-    # Visualization
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    # Create visualizations
+    fig, axes = plt.subplots(2, 3, figsize=(18, 12))
 
-    axes[0].imshow(image)
-    axes[0].set_title('Original Image')
-    axes[0].axis('off')
+    # Original image
+    axes[0, 0].imshow(image_rgb)
+    axes[0, 0].set_title('Original Image')
+    axes[0, 0].axis('off')
 
-    axes[1].imshow(prediction, cmap='gray')
-    axes[1].set_title('Predicted Mask')
-    axes[1].axis('off')
+    # Predicted mask (probability)
+    axes[0, 1].imshow(prediction[:,:,0], cmap='hot', vmin=0, vmax=1)
+    axes[0, 1].set_title('Prediction Probability')
+    axes[0, 1].axis('off')
 
-    # Overlay
-    overlay = np.array(image)
-    overlay[prediction > 0] = [255, 0, 0]  # Red overlay for predicted regions
-    axes[2].imshow(overlay)
-    axes[2].set_title('Overlay')
-    axes[2].axis('off')
+    # Binary mask
+    axes[0, 2].imshow(prediction_binary[:,:,0], cmap='gray')
+    axes[0, 2].set_title(f'Binary Mask (threshold={threshold})')
+    axes[0, 2].axis('off')
+
+    # Original size prediction
+    axes[1, 0].imshow(cv2.resize(image_rgb, (256, 256)))
+    axes[1, 0].set_title('Resized Input')
+    axes[1, 0].axis('off')
+
+    # Overlay on resized image
+    overlay_resized = cv2.resize(image_rgb, (256, 256)).copy()
+    overlay_resized[prediction_binary[:,:,0] > 0] = [255, 0, 0]  # Red overlay
+    axes[1, 1].imshow(overlay_resized)
+    axes[1, 1].set_title('Overlay (256x256)')
+    axes[1, 1].axis('off')
+
+    # Overlay on original size
+    overlay_original = image_rgb.copy()
+    overlay_original[prediction_resized > 0] = [255, 0, 0]  # Red overlay
+    axes[1, 2].imshow(overlay_original)
+    axes[1, 2].set_title('Overlay (Original Size)')
+    axes[1, 2].axis('off')
 
     plt.tight_layout()
     plt.show()
 
-    return prediction
+    return prediction, prediction_resized
+
+def batch_predict_and_save(model, image_paths, output_dir, threshold=0.5):
+    """Batch prediction and save results"""
+    os.makedirs(output_dir, exist_ok=True)
+
+    for i, image_path in enumerate(image_paths):
+        # Load and preprocess
+        image = cv2.imread(image_path)
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        original_size = image_rgb.shape[:2]
+
+        image_resized = cv2.resize(image_rgb, (256, 256))
+        image_normalized = image_resized.astype(np.float32) / 255.0
+        input_array = np.expand_dims(image_normalized, axis=0)
+
+        # Predict
+        prediction = model.predict(input_array, verbose=0)[0]
+        prediction_binary = (prediction > threshold).astype(np.uint8) * 255
+
+        # Resize back to original size
+        prediction_resized = cv2.resize(prediction_binary[:,:,0],
+                                      (original_size[1], original_size[0]),
+                                      interpolation=cv2.INTER_NEAREST)
+
+        # Save results
+        filename = os.path.basename(image_path).split('.')[0]
+        cv2.imwrite(os.path.join(output_dir, f'{filename}_mask.png'), prediction_resized)
+
+        # Create and save overlay
+        overlay = image_rgb.copy()
+        overlay[prediction_resized > 0] = [255, 0, 0]
+        overlay_bgr = cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(os.path.join(output_dir, f'{filename}_overlay.jpg'), overlay_bgr)
+
+        print(f'Processed {i+1}/{len(image_paths)}: {filename}')
 
 # Example usage
-prediction = predict_and_visualize(model, 'test_image.jpg')
+prediction, prediction_resized = predict_and_visualize(best_model, 'test_image.jpg')
+
+# Batch processing example
+# image_paths = ['test1.jpg', 'test2.jpg', 'test3.jpg']
+# batch_predict_and_save(best_model, image_paths, 'output_predictions/')
 ```
 
 ## Summary
