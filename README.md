@@ -9,29 +9,18 @@ Core Python and numerical computing foundations:
 - **[Python](/fundamentals/python/)** - Advanced Python concepts and features
 - **[NumPy](/fundamentals/numpy/)** - Numerical computing with arrays and matrices
 
-### 🧮 Scientific Computing
-Mathematical and scientific computation libraries:
-- **[SciPy](/scientific-computing/scipy/)** - Scientific algorithms and tools
-- **[SymPy](/scientific-computing/sympy/)** - Symbolic mathematics
-- **[StatsModels](/scientific-computing/statsmodels/)** - Statistical modeling
-- **[NetworkX](/scientific-computing/networkx/)** - Graph analysis and algorithms
-- **[Optimization](/scientific-computing/optimization/)** - Mathematical optimization techniques
-
 ### 📊 Data Processing
 Tools for data manipulation and analysis:
 - **[Pandas](/data-processing/pandas/)** - Data analysis and manipulation
 - **[Polars](/data-processing/polars/)** - Fast DataFrame operations
-- **[Dask](/data-processing/dask/)** - Parallel computing for larger-than-memory datasets
-- **[PyArrow](/data-processing/pyarrow/)** - Columnar data format and operations
-- **[Data Validation](/data-processing/data-validation/)** - Data quality and validation tools
+
+### 🧮 Scientific Computing
+Mathematical and scientific computation libraries:
+- **[SciPy](/scientific-computing/scipy/)** - Scientific algorithms and tools
 
 ### 📈 Visualization
 Libraries for creating plots, charts, and interactive visualizations:
 - **[Matplotlib](/visualization/matplotlib/)** - Fundamental plotting library
-- **[Seaborn](/visualization/seaborn/)** - Statistical data visualization
-- **[Plotly](/visualization/plotly/)** - Interactive visualizations and dashboards
-- **[Bokeh](/visualization/bokeh/)** - Web-based interactive plotting
-- **[Altair](/visualization/altair/)** - Declarative statistical visualization
 
 ### 🤖 Machine Learning
 Classical machine learning algorithms and libraries:
@@ -83,11 +72,11 @@ End-to-end implementations and real-world applications:
 ### Beginner
 1. Start with **Fundamentals** (Python, NumPy)
 2. Learn **Data Processing** (Pandas, basic visualization)
-3. Practice **Visualization** (Matplotlib, Seaborn)
+3. Practice **Visualization** (Matplotlib)
 4. Begin with **Machine Learning** (Scikit-learn basics)
 
 ### Intermediate
-1. Explore **Scientific Computing** (SciPy, optimization)
+1. Explore **Scientific Computing** (SciPy)
 2. Implement **ML Algorithms** from scratch (supervised learning)
 3. Learn **Deep Learning Frameworks** (PyTorch/TensorFlow)
 4. Build **Computer Vision** projects (OpenCV, basic architectures)
