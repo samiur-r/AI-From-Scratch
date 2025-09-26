@@ -916,11 +916,1157 @@ print("4. Configurable inference parameters")
 print("5. Error handling and input validation")
 ```
 
+## BERT: Bidirectional Encoder Representations from Transformers
+
+### Architecture and Key Innovations
+
+BERT revolutionized NLP by introducing **bidirectional context understanding**. Unlike traditional left-to-right language models, BERT processes text in both directions simultaneously.
+
+#### Core Components
+- **Encoder-only architecture**: Uses only the encoder stack from the original Transformer
+- **Bidirectional self-attention**: Each token can attend to all other tokens in the sequence
+- **Masked Language Modeling (MLM)**: Randomly masks tokens and predicts them using bidirectional context
+- **Next Sentence Prediction (NSP)**: Learns sentence-level relationships
+
+#### Training Objectives
+```python
+# BERT training example with Hugging Face Transformers
+from transformers import BertTokenizer, BertForMaskedLM, BertForSequenceClassification
+import torch
+
+# Masked Language Modeling
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+model = BertForMaskedLM.from_pretrained('bert-base-uncased')
+
+# Example: "The capital of France is [MASK]"
+text = "The capital of France is [MASK]."
+inputs = tokenizer(text, return_tensors='pt')
+
+with torch.no_grad():
+    outputs = model(**inputs)
+    predictions = outputs.logits
+
+# Get predicted token for masked position
+mask_token_index = torch.where(inputs["input_ids"] == tokenizer.mask_token_id)[1]
+predicted_token_id = predictions[0, mask_token_index].argmax(axis=-1)
+predicted_token = tokenizer.decode(predicted_token_id)
+print(f"Predicted word: {predicted_token}")
+
+# Fine-tuning for classification
+def fine_tune_bert_classification(texts, labels, num_classes):
+    """Fine-tune BERT for text classification"""
+
+    # Load pre-trained BERT for classification
+    model = BertForSequenceClassification.from_pretrained(
+        'bert-base-uncased',
+        num_labels=num_classes
+    )
+
+    # Tokenize inputs
+    encodings = tokenizer(texts, truncation=True, padding=True, return_tensors='pt')
+
+    # Training setup
+    optimizer = torch.optim.AdamW(model.parameters(), lr=2e-5)
+    model.train()
+
+    for epoch in range(3):  # Fine-tuning typically needs few epochs
+        optimizer.zero_grad()
+
+        outputs = model(**encodings, labels=torch.tensor(labels))
+        loss = outputs.loss
+
+        loss.backward()
+        optimizer.step()
+
+        print(f"Epoch {epoch+1}, Loss: {loss.item():.4f}")
+
+    return model
+
+# Question Answering with BERT
+from transformers import BertForQuestionAnswering
+
+qa_model = BertForQuestionAnswering.from_pretrained('bert-large-uncased-whole-word-masking-finetuned-squad')
+
+def answer_question(question, context):
+    """Answer questions using BERT"""
+    inputs = tokenizer(question, context, return_tensors='pt', truncation=True)
+
+    with torch.no_grad():
+        outputs = qa_model(**inputs)
+
+    # Get start and end positions
+    start_scores = outputs.start_logits
+    end_scores = outputs.end_logits
+
+    start_idx = torch.argmax(start_scores)
+    end_idx = torch.argmax(end_scores) + 1
+
+    # Extract answer
+    tokens = tokenizer.convert_ids_to_tokens(inputs['input_ids'][0])
+    answer = tokenizer.convert_tokens_to_string(tokens[start_idx:end_idx])
+
+    return answer.strip()
+
+# Example usage
+context = "BERT is a transformer-based model developed by Google. It uses bidirectional training."
+question = "Who developed BERT?"
+answer = answer_question(question, context)
+print(f"Answer: {answer}")
+```
+
+#### BERT Variants and Improvements
+```python
+# RoBERTa: Robustly Optimized BERT Pretraining Approach
+from transformers import RobertaTokenizer, RobertaForSequenceClassification
+
+# Key improvements: Remove NSP, larger batches, more data, byte-pair encoding
+roberta_tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+roberta_model = RobertaForSequenceClassification.from_pretrained('roberta-base', num_labels=2)
+
+# DistilBERT: Smaller, faster version
+from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
+
+# 40% smaller, 60% faster, retains 97% of BERT's performance
+distilbert_tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+distilbert_model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased')
+
+# ALBERT: A Lite BERT for Self-supervised Learning
+from transformers import AlbertTokenizer, AlbertForSequenceClassification
+
+# Parameter sharing and factorized embeddings for efficiency
+albert_tokenizer = AlbertTokenizer.from_pretrained('albert-base-v2')
+albert_model = AlbertForSequenceClassification.from_pretrained('albert-base-v2')
+
+# DeBERTa: Decoding-enhanced BERT with Disentangled Attention
+from transformers import DebertaTokenizer, DebertaForSequenceClassification
+
+# Disentangled attention mechanism and enhanced mask decoder
+deberta_tokenizer = DebertaTokenizer.from_pretrained('microsoft/deberta-base')
+deberta_model = DebertaForSequenceClassification.from_pretrained('microsoft/deberta-base')
+```
+
+### BERT Best Practices and Use Cases
+
+#### Optimal Use Cases
+- **Text Classification**: Sentiment analysis, spam detection, topic classification
+- **Named Entity Recognition**: Extracting people, places, organizations from text
+- **Question Answering**: Reading comprehension, factual Q&A systems
+- **Text Similarity**: Semantic similarity, duplicate detection
+- **Feature Extraction**: Using BERT embeddings for downstream tasks
+
+#### Implementation Guidelines
+```python
+# Best practices for BERT fine-tuning
+import torch
+from transformers import BertTokenizer, BertForSequenceClassification, AdamW
+from torch.utils.data import DataLoader, Dataset
+
+class TextClassificationDataset(Dataset):
+    def __init__(self, texts, labels, tokenizer, max_length=512):
+        self.texts = texts
+        self.labels = labels
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+
+    def __len__(self):
+        return len(self.texts)
+
+    def __getitem__(self, idx):
+        text = str(self.texts[idx])
+        label = self.labels[idx]
+
+        encoding = self.tokenizer(
+            text,
+            truncation=True,
+            padding='max_length',
+            max_length=self.max_length,
+            return_tensors='pt'
+        )
+
+        return {
+            'input_ids': encoding['input_ids'].flatten(),
+            'attention_mask': encoding['attention_mask'].flatten(),
+            'labels': torch.tensor(label, dtype=torch.long)
+        }
+
+def train_bert_classifier(train_texts, train_labels, val_texts, val_labels, num_classes):
+    """Complete BERT training pipeline"""
+
+    # Initialize tokenizer and model
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    model = BertForSequenceClassification.from_pretrained(
+        'bert-base-uncased',
+        num_labels=num_classes
+    )
+
+    # Create datasets
+    train_dataset = TextClassificationDataset(train_texts, train_labels, tokenizer)
+    val_dataset = TextClassificationDataset(val_texts, val_labels, tokenizer)
+
+    # Create data loaders
+    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=16, shuffle=False)
+
+    # Optimizer and scheduler
+    optimizer = AdamW(model.parameters(), lr=2e-5, eps=1e-8)
+
+    # Training loop
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+
+    for epoch in range(3):  # BERT typically needs 3-4 epochs
+        model.train()
+        total_loss = 0
+
+        for batch in train_loader:
+            optimizer.zero_grad()
+
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            labels = batch['labels'].to(device)
+
+            outputs = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                labels=labels
+            )
+
+            loss = outputs.loss
+            total_loss += loss.item()
+
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
+
+        # Validation
+        model.eval()
+        val_accuracy = evaluate_model(model, val_loader, device)
+
+        print(f"Epoch {epoch+1}:")
+        print(f"  Average training loss: {total_loss/len(train_loader):.4f}")
+        print(f"  Validation accuracy: {val_accuracy:.4f}")
+
+    return model
+
+def evaluate_model(model, data_loader, device):
+    """Evaluate model accuracy"""
+    model.eval()
+    correct = 0
+    total = 0
+
+    with torch.no_grad():
+        for batch in data_loader:
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            labels = batch['labels'].to(device)
+
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+            predictions = torch.argmax(outputs.logits, dim=-1)
+
+            correct += (predictions == labels).sum().item()
+            total += labels.size(0)
+
+    return correct / total
+
+# Feature extraction with BERT
+def extract_bert_features(texts, model_name='bert-base-uncased', layer=-1):
+    """Extract BERT features for downstream tasks"""
+    from transformers import BertModel, BertTokenizer
+
+    tokenizer = BertTokenizer.from_pretrained(model_name)
+    model = BertModel.from_pretrained(model_name, output_hidden_states=True)
+    model.eval()
+
+    features = []
+
+    for text in texts:
+        inputs = tokenizer(text, return_tensors='pt', truncation=True, padding=True)
+
+        with torch.no_grad():
+            outputs = model(**inputs)
+
+            # Extract features from specified layer
+            hidden_states = outputs.hidden_states[layer]  # Shape: [batch, seq_len, hidden_size]
+
+            # Use [CLS] token representation for sentence-level features
+            cls_features = hidden_states[0, 0, :]  # [CLS] token
+            features.append(cls_features.numpy())
+
+    return np.array(features)
+```
+
+## GPT: Generative Pre-trained Transformer
+
+### Architecture and Autoregressive Generation
+
+GPT represents the **decoder-only** approach to transformers, designed specifically for **autoregressive text generation**. It predicts the next token based on all previous tokens in the sequence.
+
+#### Core Architecture
+- **Decoder-only structure**: Uses only the decoder stack with causal (unidirectional) attention
+- **Causal masking**: Each position can only attend to previous positions
+- **Autoregressive training**: Predicts next token given previous context
+- **Unsupervised pre-training**: Trained on large text corpora without labels
+
+#### GPT Evolution and Implementation
+```python
+# GPT implementation and usage examples
+from transformers import GPT2LMHeadModel, GPT2Tokenizer, GPT2Config
+import torch
+
+# Load pre-trained GPT-2
+tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+model = GPT2LMHeadModel.from_pretrained('gpt2')
+
+# Add padding token if not present
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+def generate_text(prompt, model, tokenizer, max_length=100, temperature=0.7, top_p=0.9):
+    """Generate text using GPT with various decoding strategies"""
+
+    # Encode the prompt
+    input_ids = tokenizer.encode(prompt, return_tensors='pt')
+
+    # Generate with different strategies
+    with torch.no_grad():
+        # Greedy decoding (deterministic)
+        greedy_output = model.generate(
+            input_ids,
+            max_length=max_length,
+            do_sample=False,
+            pad_token_id=tokenizer.eos_token_id
+        )
+
+        # Sampling with temperature
+        temperature_output = model.generate(
+            input_ids,
+            max_length=max_length,
+            do_sample=True,
+            temperature=temperature,
+            pad_token_id=tokenizer.eos_token_id
+        )
+
+        # Top-p (nucleus) sampling
+        top_p_output = model.generate(
+            input_ids,
+            max_length=max_length,
+            do_sample=True,
+            top_p=top_p,
+            temperature=temperature,
+            pad_token_id=tokenizer.eos_token_id
+        )
+
+        # Top-k sampling
+        top_k_output = model.generate(
+            input_ids,
+            max_length=max_length,
+            do_sample=True,
+            top_k=50,
+            temperature=temperature,
+            pad_token_id=tokenizer.eos_token_id
+        )
+
+    # Decode results
+    results = {
+        'greedy': tokenizer.decode(greedy_output[0], skip_special_tokens=True),
+        'temperature': tokenizer.decode(temperature_output[0], skip_special_tokens=True),
+        'top_p': tokenizer.decode(top_p_output[0], skip_special_tokens=True),
+        'top_k': tokenizer.decode(top_k_output[0], skip_special_tokens=True)
+    }
+
+    return results
+
+# Example text generation
+prompt = "The future of artificial intelligence is"
+generated_texts = generate_text(prompt, model, tokenizer)
+
+print("Text Generation Results:")
+for method, text in generated_texts.items():
+    print(f"\n{method.upper()}: {text}")
+
+# Fine-tuning GPT for specific tasks
+class GPTFineTuner:
+    def __init__(self, model_name='gpt2', device='cpu'):
+        self.device = device
+        self.tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+        self.model = GPT2LMHeadModel.from_pretrained(model_name).to(device)
+
+        # Set padding token
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+            self.model.config.pad_token_id = self.tokenizer.eos_token_id
+
+    def prepare_data(self, texts, max_length=512):
+        """Prepare training data"""
+        input_ids = []
+        attention_masks = []
+
+        for text in texts:
+            # Add EOS token to the end
+            text_with_eos = text + self.tokenizer.eos_token
+
+            # Tokenize
+            encoded = self.tokenizer(
+                text_with_eos,
+                truncation=True,
+                padding='max_length',
+                max_length=max_length,
+                return_tensors='pt'
+            )
+
+            input_ids.append(encoded['input_ids'])
+            attention_masks.append(encoded['attention_mask'])
+
+        return torch.cat(input_ids, dim=0), torch.cat(attention_masks, dim=0)
+
+    def fine_tune(self, train_texts, epochs=3, batch_size=4, learning_rate=5e-5):
+        """Fine-tune GPT on custom data"""
+
+        # Prepare data
+        input_ids, attention_masks = self.prepare_data(train_texts)
+
+        # Create dataset
+        dataset = torch.utils.data.TensorDataset(input_ids, attention_masks)
+        dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+        # Optimizer
+        optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
+
+        # Training loop
+        self.model.train()
+
+        for epoch in range(epochs):
+            total_loss = 0
+
+            for batch in dataloader:
+                input_ids_batch, attention_mask_batch = [b.to(self.device) for b in batch]
+
+                # Forward pass
+                outputs = self.model(
+                    input_ids=input_ids_batch,
+                    attention_mask=attention_mask_batch,
+                    labels=input_ids_batch  # For language modeling, labels = input_ids
+                )
+
+                loss = outputs.loss
+                total_loss += loss.item()
+
+                # Backward pass
+                optimizer.zero_grad()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+                optimizer.step()
+
+            avg_loss = total_loss / len(dataloader)
+            print(f"Epoch {epoch+1}/{epochs}, Average Loss: {avg_loss:.4f}")
+
+    def generate(self, prompt, **generation_kwargs):
+        """Generate text with the fine-tuned model"""
+        input_ids = self.tokenizer.encode(prompt, return_tensors='pt').to(self.device)
+
+        with torch.no_grad():
+            output = self.model.generate(
+                input_ids,
+                pad_token_id=self.tokenizer.eos_token_id,
+                **generation_kwargs
+            )
+
+        return self.tokenizer.decode(output[0], skip_special_tokens=True)
+
+# Advanced GPT techniques
+def implement_gpt_chat_interface():
+    """Create a conversational interface with GPT"""
+
+    class ChatGPT:
+        def __init__(self, model_name='microsoft/DialoGPT-medium'):
+            self.tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+            self.model = GPT2LMHeadModel.from_pretrained(model_name)
+            self.chat_history_ids = None
+
+            # Set padding token
+            if self.tokenizer.pad_token is None:
+                self.tokenizer.pad_token = self.tokenizer.eos_token
+
+        def generate_response(self, user_input):
+            """Generate response in conversation context"""
+
+            # Encode user input
+            new_user_input_ids = self.tokenizer.encode(
+                user_input + self.tokenizer.eos_token,
+                return_tensors='pt'
+            )
+
+            # Append to chat history
+            bot_input_ids = torch.cat([
+                self.chat_history_ids, new_user_input_ids
+            ], dim=-1) if self.chat_history_ids is not None else new_user_input_ids
+
+            # Generate response
+            with torch.no_grad():
+                self.chat_history_ids = self.model.generate(
+                    bot_input_ids,
+                    max_length=1000,
+                    num_beams=5,
+                    early_stopping=True,
+                    temperature=0.7,
+                    do_sample=True,
+                    pad_token_id=self.tokenizer.eos_token_id
+                )
+
+            # Decode and return response
+            response = self.tokenizer.decode(
+                self.chat_history_ids[:, bot_input_ids.shape[-1]:][0],
+                skip_special_tokens=True
+            )
+
+            return response
+
+        def reset_conversation(self):
+            """Reset chat history"""
+            self.chat_history_ids = None
+
+    return ChatGPT()
+
+# Example usage of advanced GPT features
+print("\n=== GPT Advanced Features ===")
+
+# Fine-tuning example
+training_texts = [
+    "The weather today is sunny and bright.",
+    "Machine learning models require large datasets.",
+    "Natural language processing has many applications.",
+    "Deep learning networks can solve complex problems."
+]
+
+# gpt_trainer = GPTFineTuner(device='cpu')
+# gpt_trainer.fine_tune(training_texts, epochs=1)
+print("GPT fine-tuning setup complete")
+
+# Chat interface
+# chat_bot = implement_gpt_chat_interface()
+print("Chat interface ready")
+```
+
+### GPT Model Scaling and Variants
+
+#### Model Size Progression
+```python
+# Different GPT model sizes and their characteristics
+gpt_models = {
+    'gpt2': {
+        'parameters': '117M',
+        'layers': 12,
+        'heads': 12,
+        'd_model': 768,
+        'context_length': 1024,
+        'use_case': 'General text generation, fine-tuning'
+    },
+    'gpt2-medium': {
+        'parameters': '345M',
+        'layers': 24,
+        'heads': 16,
+        'd_model': 1024,
+        'context_length': 1024,
+        'use_case': 'Better quality text generation'
+    },
+    'gpt2-large': {
+        'parameters': '762M',
+        'layers': 36,
+        'heads': 20,
+        'd_model': 1280,
+        'context_length': 1024,
+        'use_case': 'High-quality text generation'
+    },
+    'gpt2-xl': {
+        'parameters': '1.5B',
+        'layers': 48,
+        'heads': 25,
+        'd_model': 1600,
+        'context_length': 1024,
+        'use_case': 'Highest quality GPT-2 generation'
+    }
+}
+
+def load_gpt_variant(model_size='gpt2'):
+    """Load different GPT model sizes"""
+    from transformers import GPT2LMHeadModel, GPT2Tokenizer
+
+    print(f"Loading {model_size}...")
+    print(f"Parameters: {gpt_models[model_size]['parameters']}")
+    print(f"Context length: {gpt_models[model_size]['context_length']}")
+
+    tokenizer = GPT2Tokenizer.from_pretrained(model_size)
+    model = GPT2LMHeadModel.from_pretrained(model_size)
+
+    return model, tokenizer
+
+# Code generation with GPT
+def gpt_code_generation():
+    """Demonstrate code generation capabilities"""
+    from transformers import GPT2LMHeadModel, GPT2Tokenizer
+
+    # For code generation, you might use specialized models like:
+    # - microsoft/CodeGPT-small-py (Python code)
+    # - Salesforce/codegen-350M-mono (code generation)
+
+    model_name = 'gpt2'  # Using standard GPT-2 for demonstration
+    tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+    model = GPT2LMHeadModel.from_pretrained(model_name)
+
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    code_prompts = [
+        "def fibonacci(n):",
+        "# Function to sort a list",
+        "import numpy as np\n\ndef matrix_multiply(",
+        "class DataProcessor:\n    def __init__(self):"
+    ]
+
+    print("Code Generation Examples:")
+    for prompt in code_prompts:
+        input_ids = tokenizer.encode(prompt, return_tensors='pt')
+
+        with torch.no_grad():
+            output = model.generate(
+                input_ids,
+                max_length=input_ids.shape[1] + 50,
+                temperature=0.3,  # Lower temperature for more structured code
+                do_sample=True,
+                top_p=0.9,
+                pad_token_id=tokenizer.eos_token_id
+            )
+
+        generated_code = tokenizer.decode(output[0], skip_special_tokens=True)
+        print(f"\nPrompt: {prompt}")
+        print(f"Generated: {generated_code}")
+
+# Creative writing with GPT
+def creative_writing_assistant():
+    """GPT for creative writing tasks"""
+
+    creative_prompts = [
+        "In a world where time flows backwards,",
+        "The last bookstore on Earth",
+        "She opened the mysterious letter and discovered",
+        "The robot had learned to dream, and its dreams were"
+    ]
+
+    writing_styles = {
+        'horror': "Write in a dark, suspenseful horror style.",
+        'sci_fi': "Write in a scientific, futuristic style.",
+        'romance': "Write in a warm, emotional romantic style.",
+        'mystery': "Write in a clever, intriguing mystery style."
+    }
+
+    print("\nCreative Writing Assistant:")
+    for prompt in creative_prompts[:2]:  # Limit for demo
+        for style_name, style_instruction in list(writing_styles.items())[:2]:
+            full_prompt = f"{style_instruction}\n\n{prompt}"
+
+            # Generate creative text
+            generated = generate_text(
+                full_prompt, model, tokenizer,
+                max_length=150, temperature=0.8, top_p=0.9
+            )
+
+            print(f"\nPrompt: {prompt}")
+            print(f"Style: {style_name}")
+            print(f"Generated: {generated['top_p'][len(full_prompt):]}")
+
+# Run GPT demonstrations
+print("Running GPT code generation demo...")
+gpt_code_generation()
+
+print("\nRunning creative writing demo...")
+creative_writing_assistant()
+```
+
+## T5: Text-to-Text Transfer Transformer
+
+### Unified Text-to-Text Framework
+
+T5 introduced the revolutionary **"text-to-text"** paradigm, where every NLP task is framed as generating target text given source text. This unified approach enables a single model to handle multiple tasks.
+
+#### Core Innovation: Everything is Text-to-Text
+- **Input format**: All tasks use text input with task-specific prefixes
+- **Output format**: All tasks generate text output
+- **Unified training**: Single model learns multiple tasks simultaneously
+- **Transfer learning**: Knowledge transfers across tasks through shared representations
+
+#### T5 Architecture and Implementation
+```python
+# T5 implementation for multiple tasks
+from transformers import T5Tokenizer, T5ForConditionalGeneration
+import torch
+
+# Load pre-trained T5
+tokenizer = T5Tokenizer.from_pretrained('t5-small')
+model = T5ForConditionalGeneration.from_pretrained('t5-small')
+
+class T5MultiTaskProcessor:
+    """Unified T5 processor for multiple NLP tasks"""
+
+    def __init__(self, model_name='t5-small'):
+        self.tokenizer = T5Tokenizer.from_pretrained(model_name)
+        self.model = T5ForConditionalGeneration.from_pretrained(model_name)
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model.to(self.device)
+
+    def generate_response(self, input_text, max_length=512, num_beams=4):
+        """Generate response for any T5 task"""
+
+        # Tokenize input
+        input_ids = self.tokenizer(
+            input_text,
+            return_tensors='pt',
+            truncation=True,
+            padding=True
+        ).input_ids.to(self.device)
+
+        # Generate output
+        with torch.no_grad():
+            outputs = self.model.generate(
+                input_ids,
+                max_length=max_length,
+                num_beams=num_beams,
+                early_stopping=True,
+                do_sample=False
+            )
+
+        # Decode and return
+        response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        return response
+
+    def summarize_text(self, text):
+        """Text summarization"""
+        input_text = f"summarize: {text}"
+        return self.generate_response(input_text)
+
+    def translate_text(self, text, target_language):
+        """Text translation"""
+        input_text = f"translate English to {target_language}: {text}"
+        return self.generate_response(input_text)
+
+    def answer_question(self, question, context):
+        """Question answering"""
+        input_text = f"question: {question} context: {context}"
+        return self.generate_response(input_text)
+
+    def classify_sentiment(self, text):
+        """Sentiment classification"""
+        input_text = f"sentiment: {text}"
+        return self.generate_response(input_text, max_length=10)
+
+    def generate_title(self, article):
+        """Generate article title"""
+        input_text = f"headline: {article}"
+        return self.generate_response(input_text, max_length=50)
+
+    def paraphrase_text(self, text):
+        """Text paraphrasing"""
+        input_text = f"paraphrase: {text}"
+        return self.generate_response(input_text)
+
+    def complete_sentence(self, partial_sentence):
+        """Sentence completion"""
+        input_text = f"complete: {partial_sentence}"
+        return self.generate_response(input_text)
+
+# Initialize T5 processor
+t5_processor = T5MultiTaskProcessor()
+
+# Demonstrate multiple tasks
+def demonstrate_t5_tasks():
+    """Demonstrate T5's multi-task capabilities"""
+
+    # Text summarization
+    article = """
+    Artificial intelligence has made remarkable progress in recent years.
+    Machine learning models can now perform tasks that were once thought
+    impossible for computers. Deep learning has enabled breakthroughs in
+    computer vision, natural language processing, and speech recognition.
+    These advances are transforming industries and creating new opportunities
+    for innovation.
+    """
+
+    summary = t5_processor.summarize_text(article)
+    print("=== TEXT SUMMARIZATION ===")
+    print(f"Original: {article.strip()}")
+    print(f"Summary: {summary}")
+
+    # Question answering
+    context = """
+    T5 is a text-to-text transfer transformer developed by Google.
+    It treats every NLP task as a text generation problem. The model
+    was trained on a large corpus called C4 (Colossal Clean Crawled Corpus).
+    """
+
+    question = "Who developed T5?"
+    answer = t5_processor.answer_question(question, context)
+    print(f"\n=== QUESTION ANSWERING ===")
+    print(f"Context: {context}")
+    print(f"Question: {question}")
+    print(f"Answer: {answer}")
+
+    # Translation (note: T5-small may have limited translation capabilities)
+    english_text = "Hello, how are you today?"
+    try:
+        french_translation = t5_processor.translate_text(english_text, "French")
+        print(f"\n=== TRANSLATION ===")
+        print(f"English: {english_text}")
+        print(f"French: {french_translation}")
+    except:
+        print(f"\n=== TRANSLATION ===")
+        print("Translation capabilities limited in T5-small model")
+
+    # Paraphrasing
+    original_text = "The weather is very nice today"
+    paraphrase = t5_processor.paraphrase_text(original_text)
+    print(f"\n=== PARAPHRASING ===")
+    print(f"Original: {original_text}")
+    print(f"Paraphrase: {paraphrase}")
+
+    # Title generation
+    article_snippet = "Scientists have discovered a new species of butterfly in the Amazon rainforest. The butterfly has unique wing patterns that help it camouflage among the leaves."
+    title = t5_processor.generate_title(article_snippet)
+    print(f"\n=== TITLE GENERATION ===")
+    print(f"Article: {article_snippet}")
+    print(f"Generated Title: {title}")
+
+# Fine-tuning T5 for custom tasks
+class T5FineTuner:
+    """Fine-tune T5 for specific tasks"""
+
+    def __init__(self, model_name='t5-small'):
+        self.tokenizer = T5Tokenizer.from_pretrained(model_name)
+        self.model = T5ForConditionalGeneration.from_pretrained(model_name)
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model.to(self.device)
+
+    def prepare_dataset(self, input_texts, target_texts, max_input_length=512, max_target_length=128):
+        """Prepare dataset for fine-tuning"""
+
+        # Tokenize inputs and targets
+        input_encodings = self.tokenizer(
+            input_texts,
+            truncation=True,
+            padding=True,
+            max_length=max_input_length,
+            return_tensors='pt'
+        )
+
+        target_encodings = self.tokenizer(
+            target_texts,
+            truncation=True,
+            padding=True,
+            max_length=max_target_length,
+            return_tensors='pt'
+        )
+
+        return input_encodings, target_encodings
+
+    def fine_tune(self, train_inputs, train_targets, val_inputs=None, val_targets=None,
+                  epochs=3, batch_size=4, learning_rate=1e-4):
+        """Fine-tune T5 on custom data"""
+
+        # Prepare datasets
+        train_input_encodings, train_target_encodings = self.prepare_dataset(train_inputs, train_targets)
+
+        if val_inputs:
+            val_input_encodings, val_target_encodings = self.prepare_dataset(val_inputs, val_targets)
+
+        # Create data loaders
+        train_dataset = torch.utils.data.TensorDataset(
+            train_input_encodings['input_ids'],
+            train_input_encodings['attention_mask'],
+            train_target_encodings['input_ids']
+        )
+
+        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
+        # Optimizer
+        optimizer = torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
+
+        # Training loop
+        self.model.train()
+
+        for epoch in range(epochs):
+            total_loss = 0
+
+            for batch in train_loader:
+                input_ids, attention_mask, labels = [b.to(self.device) for b in batch]
+
+                # Forward pass
+                outputs = self.model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    labels=labels
+                )
+
+                loss = outputs.loss
+                total_loss += loss.item()
+
+                # Backward pass
+                optimizer.zero_grad()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+                optimizer.step()
+
+            avg_loss = total_loss / len(train_loader)
+            print(f"Epoch {epoch+1}/{epochs}, Average Loss: {avg_loss:.4f}")
+
+            # Validation
+            if val_inputs:
+                val_loss = self.evaluate(val_input_encodings, val_target_encodings)
+                print(f"Validation Loss: {val_loss:.4f}")
+
+    def evaluate(self, input_encodings, target_encodings):
+        """Evaluate model on validation data"""
+        self.model.eval()
+
+        with torch.no_grad():
+            outputs = self.model(
+                input_ids=input_encodings['input_ids'].to(self.device),
+                attention_mask=input_encodings['attention_mask'].to(self.device),
+                labels=target_encodings['input_ids'].to(self.device)
+            )
+
+            return outputs.loss.item()
+
+# Custom task example: Email classification and response generation
+def create_email_processor():
+    """Create a T5-based email processing system"""
+
+    class EmailProcessor(T5FineTuner):
+        def classify_email_urgency(self, email_text):
+            """Classify email urgency"""
+            input_text = f"classify urgency: {email_text}"
+
+            input_ids = self.tokenizer(input_text, return_tensors='pt').input_ids.to(self.device)
+
+            with torch.no_grad():
+                outputs = self.model.generate(input_ids, max_length=20)
+
+            return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+        def generate_email_response(self, email_text):
+            """Generate email response"""
+            input_text = f"respond to email: {email_text}"
+
+            input_ids = self.tokenizer(input_text, return_tensors='pt').input_ids.to(self.device)
+
+            with torch.no_grad():
+                outputs = self.model.generate(input_ids, max_length=100, num_beams=4)
+
+            return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+        def extract_email_summary(self, email_text):
+            """Extract key points from email"""
+            input_text = f"extract key points: {email_text}"
+
+            input_ids = self.tokenizer(input_text, return_tensors='pt').input_ids.to(self.device)
+
+            with torch.no_grad():
+                outputs = self.model.generate(input_ids, max_length=100)
+
+            return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+    return EmailProcessor()
+
+# Advanced T5 techniques
+def implement_t5_multitask_learning():
+    """Implement multi-task learning with T5"""
+
+    # Sample multi-task training data
+    multitask_data = {
+        'summarization': {
+            'inputs': [
+                "summarize: The meeting discussed budget allocations for the next quarter. Several departments requested additional funding.",
+                "summarize: New research shows that exercise improves cognitive function and memory retention in adults."
+            ],
+            'targets': [
+                "Meeting covered quarterly budget and funding requests.",
+                "Research links exercise to better cognitive function."
+            ]
+        },
+        'translation': {
+            'inputs': [
+                "translate English to French: Good morning, have a nice day.",
+                "translate English to Spanish: The book is on the table."
+            ],
+            'targets': [
+                "Bonjour, passez une bonne journée.",
+                "El libro está sobre la mesa."
+            ]
+        },
+        'classification': {
+            'inputs': [
+                "sentiment: This movie was absolutely fantastic!",
+                "sentiment: I'm disappointed with the service quality."
+            ],
+            'targets': [
+                "positive",
+                "negative"
+            ]
+        }
+    }
+
+    # Combine all tasks
+    all_inputs = []
+    all_targets = []
+
+    for task_name, task_data in multitask_data.items():
+        all_inputs.extend(task_data['inputs'])
+        all_targets.extend(task_data['targets'])
+
+    print("Multi-task Learning Data Prepared:")
+    print(f"Total training examples: {len(all_inputs)}")
+    print(f"Tasks: {list(multitask_data.keys())}")
+
+    # This would be used for fine-tuning
+    # t5_trainer = T5FineTuner()
+    # t5_trainer.fine_tune(all_inputs, all_targets, epochs=1)
+
+    return all_inputs, all_targets
+
+# Run T5 demonstrations
+print("=== T5: Text-to-Text Transfer Transformer ===")
+demonstrate_t5_tasks()
+
+print("\n=== Multi-task Learning Setup ===")
+multitask_inputs, multitask_targets = implement_t5_multitask_learning()
+
+print("\n=== Email Processor Ready ===")
+email_processor = create_email_processor()
+print("Custom email processing system initialized")
+```
+
+### T5 Variants and Scaling
+
+#### Model Sizes and Capabilities
+```python
+# T5 model variants and their specifications
+t5_variants = {
+    't5-small': {
+        'parameters': '60M',
+        'encoder_layers': 6,
+        'decoder_layers': 6,
+        'heads': 8,
+        'd_model': 512,
+        'd_ff': 2048,
+        'use_case': 'Prototyping, lightweight applications'
+    },
+    't5-base': {
+        'parameters': '220M',
+        'encoder_layers': 12,
+        'decoder_layers': 12,
+        'heads': 12,
+        'd_model': 768,
+        'd_ff': 3072,
+        'use_case': 'Balanced performance and efficiency'
+    },
+    't5-large': {
+        'parameters': '770M',
+        'encoder_layers': 24,
+        'decoder_layers': 24,
+        'heads': 16,
+        'd_model': 1024,
+        'd_ff': 4096,
+        'use_case': 'High-quality text generation'
+    },
+    't5-3b': {
+        'parameters': '3B',
+        'encoder_layers': 24,
+        'decoder_layers': 24,
+        'heads': 32,
+        'd_model': 1024,
+        'd_ff': 16384,
+        'use_case': 'Advanced applications, research'
+    },
+    't5-11b': {
+        'parameters': '11B',
+        'encoder_layers': 24,
+        'decoder_layers': 24,
+        'heads': 128,
+        'd_model': 1024,
+        'd_ff': 65536,
+        'use_case': 'State-of-the-art performance'
+    }
+}
+
+def compare_t5_models():
+    """Compare different T5 model sizes"""
+
+    print("T5 Model Comparison:")
+    print("-" * 80)
+    print(f"{'Model':<12} {'Parameters':<12} {'Layers':<8} {'Heads':<8} {'d_model':<10} {'Use Case'}")
+    print("-" * 80)
+
+    for model_name, specs in t5_variants.items():
+        layers = f"{specs['encoder_layers']}/{specs['decoder_layers']}"
+        print(f"{model_name:<12} {specs['parameters']:<12} {layers:<8} {specs['heads']:<8} {specs['d_model']:<10} {specs['use_case']}")
+
+# T5 for specific domains
+def create_domain_specific_t5():
+    """Create T5 variants for specific domains"""
+
+    domain_tasks = {
+        'legal': {
+            'task_prefix': 'legal',
+            'example_tasks': [
+                'legal summarize: [legal document]',
+                'legal classify: [contract type]',
+                'legal extract: [key terms from agreement]'
+            ]
+        },
+        'medical': {
+            'task_prefix': 'medical',
+            'example_tasks': [
+                'medical summarize: [patient report]',
+                'medical diagnose: [symptoms]',
+                'medical explain: [medical term]'
+            ]
+        },
+        'code': {
+            'task_prefix': 'code',
+            'example_tasks': [
+                'code explain: [code snippet]',
+                'code generate: [function description]',
+                'code debug: [error description]'
+            ]
+        },
+        'scientific': {
+            'task_prefix': 'science',
+            'example_tasks': [
+                'science summarize: [research paper]',
+                'science explain: [scientific concept]',
+                'science predict: [experimental outcome]'
+            ]
+        }
+    }
+
+    print("Domain-Specific T5 Applications:")
+    for domain, config in domain_tasks.items():
+        print(f"\n{domain.upper()} DOMAIN:")
+        for task in config['example_tasks']:
+            print(f"  - {task}")
+
+    return domain_tasks
+
+# Run T5 comparisons and domain examples
+print("\n" + "="*60)
+compare_t5_models()
+
+print("\n" + "="*60)
+domain_configs = create_domain_specific_t5()
+```
+
 ## Transformer Variants Comparison
 
 | Variant | Key Innovation | Advantages | Use Cases | Notable Examples |
 |---------|---------------|------------|-----------|------------------|
-| **BERT** | Bidirectional encoding | Strong contextual understanding | Classification, Q&A | BERT, RoBERTa, DeBERTa |
+| **BERT** | Bidirectional encoding | Strong contextual understanding | Classification, Q&A, NER | BERT, RoBERTa, DeBERTa |
 | **GPT** | Autoregressive generation | Excellent text generation | Language modeling, chat | GPT-3/4, ChatGPT |
 | **T5** | Text-to-text framework | Unified training objective | Multi-task learning | T5, UL2 |
 | **BART** | Denoising autoencoder | Good for text understanding + generation | Summarization, translation | BART, PEGASUS |
