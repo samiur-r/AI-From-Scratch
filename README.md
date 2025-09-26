@@ -41,77 +41,97 @@ Classical machine learning algorithms and libraries:
 
 #### Algorithms from Scratch
 - **[Supervised Learning](/machine-learning/algorithms/supervised/)** - Classification and regression algorithms
+  - Linear/Logistic Regression, Decision Trees, Random Forest, SVM, KNN, Naive Bayes
 - **[Unsupervised Learning](/machine-learning/algorithms/unsupervised/)** - Clustering and dimensionality reduction
 - **[Reinforcement Learning](/machine-learning/algorithms/reinforcement/)** - RL algorithms and techniques
 
 ### 🧠 Deep Learning
 Neural networks, frameworks, and architectures:
-- **[Frameworks](/deep-learning/frameworks/)** - PyTorch, TensorFlow, Keras, JAX, Lightning
-- **[Architectures](/deep-learning/architectures/)** - CNN, RNN, Transformers, GANs, and more
+- **[Frameworks](/deep-learning/frameworks/)** - PyTorch, TensorFlow, JAX, Lightning
+- **[Architectures](/deep-learning/architectures/)** - Neural network architectures and implementations
+  - CNN, RNN/LSTM/GRU, Feedforward, ResNet, GANs
 - **[Optimization](/deep-learning/optimization/)** - Training techniques and optimization
 
 ### 👁️ Computer Vision
 Image processing and computer vision techniques:
 - **[OpenCV](/computer-vision/opencv/)** - Computer vision library
-- **[Pillow](/computer-vision/pillow/)** - Python Imaging Library
-- **[Object Detection](/computer-vision/object-detection/)** - YOLO, R-CNN implementations
-- **[Face Recognition](/computer-vision/face-recognition/)** - Facial analysis techniques
-- **[Image Segmentation](/computer-vision/segmentation/)** - Pixel-level classification
+- **[YOLO](/computer-vision/yolo/)** - Object detection and real-time applications
+- **[Vision Transformer](/computer-vision/vision-transformer/)** - Transformer-based image classification
+- **[U-Net](/computer-vision/unet/)** - Semantic segmentation architecture
+- **[CLIP](/computer-vision/clip/)** - Contrastive Language-Image Pre-training
+- **[Diffusion Models](/computer-vision/diffusion-models/)** - Text-to-image generation and creative AI
 
 ### 💬 Natural Language Processing
 Text processing and language model tools:
-- **[NLP Fundamentals](/natural-language/nlp-fundamentals/)** - NLTK, spaCy basics
-- **[Traditional NLP](/natural-language/traditional-nlp/)** - Classical text processing
-- **[Large Language Models](/natural-language/llm/)** - Modern NLP with transformers
-
-#### LLM Tools & Techniques
-- **[Transformers](/natural-language/transformers/)** - Hugging Face ecosystem
-- **[LangChain](/natural-language/langchain/)** - LLM application framework
-- **[OpenAI API](/natural-language/openai-api/)** - GPT integration
-- **[Fine-tuning](/natural-language/llm/fine-tuning/)** - Model customization
-- **[RAG](/natural-language/llm/rag/)** - Retrieval Augmented Generation
-- **[Prompt Engineering](/natural-language/llm/prompt-engineering/)** - Effective prompting
+- **[NLTK](/natural-language/nltk/)** - Natural Language Toolkit for text processing
+- **[spaCy](/natural-language/spacy/)** - Industrial-strength NLP library
+- **[Transformers](/natural-language/transformers/)** - BERT, GPT, T5 and modern transformer architectures
 
 ### 🚀 Projects
 End-to-end implementations and real-world applications:
-- **[Image Classification](/projects/image-classification/)** - Complete CV pipeline
-- **[Sentiment Analysis](/projects/sentiment-analysis/)** - NLP project implementation
-- **[Recommendation System](/projects/recommendation-system/)** - Collaborative filtering
+- **[Image Classification](/projects/image-classification/)** - Complete computer vision pipeline
+- **[Sentiment Analysis](/projects/sentiment-analysis/)** - NLP sentiment classification project
+- **[Recommendation System](/projects/recommendation-system/)** - Collaborative filtering and content-based recommendations
 - **[Chatbot](/projects/chatbot/)** - Conversational AI system
+- **[Classification](/projects/classification/)** - General classification projects and techniques
+- **[Clustering](/projects/clustering/)** - Unsupervised learning and data grouping
+- **[Regression](/projects/regression/)** - Predictive modeling and regression analysis
+- **[Deployment](/projects/deployment/)** - Model deployment and production strategies
 
 ## 🎯 Learning Path
 
 ### Beginner
 1. Start with **Fundamentals** (Python, NumPy)
-2. Learn **Data Processing** (Pandas)
+2. Learn **Data Processing** (Pandas, basic visualization)
 3. Practice **Visualization** (Matplotlib, Seaborn)
-4. Begin with **Machine Learning** (Scikit-learn)
+4. Begin with **Machine Learning** (Scikit-learn basics)
 
 ### Intermediate
-1. Explore **Scientific Computing** (SciPy)
-2. Implement **ML Algorithms** from scratch
+1. Explore **Scientific Computing** (SciPy, optimization)
+2. Implement **ML Algorithms** from scratch (supervised learning)
 3. Learn **Deep Learning Frameworks** (PyTorch/TensorFlow)
-4. Build simple **Projects**
+4. Build **Computer Vision** projects (OpenCV, basic architectures)
+5. Work with **NLP** tools (NLTK, spaCy)
 
 ### Advanced
-1. Master **Neural Network Architectures**
-2. Specialize in **Computer Vision** or **NLP**
-3. Work with **Large Language Models**
-4. Create complex **End-to-end Projects**
+1. Master **Deep Learning Architectures** (CNNs, RNNs, Transformers)
+2. Explore **Modern Computer Vision** (YOLO, Vision Transformers, Diffusion Models)
+3. Work with **Advanced NLP** (BERT, GPT, T5, transformer fine-tuning)
+4. Build **End-to-end Projects** with deployment strategies
+5. Specialize in specific domains (Computer Vision, NLP, or MLOps)
 
 ## 📖 Quick Reference Format
 
-Each library/algorithm follows a consistent structure:
-- **Installation** instructions
-- **Basic usage** examples
-- **Core concepts** and syntax
-- **Common patterns** and best practices
-- **Performance tips**
-- **Real-world examples**
+Each guide follows a consistent, comprehensive structure:
+
+### For Libraries/Frameworks:
+- **Installation** instructions with dependencies
+- **Core concepts** and fundamental usage
+- **Practical examples** with real-world applications
+- **Advanced features** and optimization techniques
+- **Best practices** and common patterns
+- **Integration** with other tools
+
+### For Algorithms:
+- **Algorithm overview** and mathematical foundations
+- **When to use it** - problem types and data characteristics
+- **Strengths & weaknesses** analysis
+- **Important hyperparameters** and tuning strategies
+- **Key assumptions** and requirements
+- **Complete implementation** with step-by-step explanations
+- **Evaluation methods** and performance metrics
 
 ## 🛠️ Usage
 
 Navigate to any directory to find comprehensive quick reference guides. Each `readme.md` file contains practical examples and explanations for the respective technology.
+
+## 📊 Repository Statistics
+
+- **54 comprehensive guides** covering essential AI/ML technologies
+- **8 major categories** from fundamentals to advanced projects
+- **Complete code examples** with explanations for every technology
+- **Production-ready implementations** with best practices
+- **Consistent documentation format** for easy navigation
 
 ## 🤝 Contributing
 
